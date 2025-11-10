@@ -5,16 +5,17 @@ services:
     build: ./semantic-sql
     container_name: semantic-sql
     depends_on:
-      - postgres-db          
+      - postgres-db
     ports:
       - "8888:8888"
     environment:
       - POSTGRES_HOST=postgres-db
       - POSTGRES_DB=semanticdb
+      - POSTGRES_PORT=5432
       - POSTGRES_USER=semantic_user
       - POSTGRES_PASSWORD=semantic_pass
     volumes:
-      - ./data_persistent:/workspace
+      - ./data:/data
       - .:/app
     command: jupyter lab --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/workspace
 
@@ -30,12 +31,25 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./entrypoint_db/init_db.sh:/docker-entrypoint-initdb.d/init_db.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U semantic_user -d semanticdb"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  data-import:
+    image: python:3.12
+    container_name: data-import
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    volumes:
+      - ./data:/data
+      - ./import_churn_data.py:/app/import_churn_data.py
+    command: >
+      bash -c "pip install pandas sqlalchemy psycopg2-binary &&
+               python /app/import_churn_data.py"
+    restart: "no"
 
 volumes:
   postgres_data:
