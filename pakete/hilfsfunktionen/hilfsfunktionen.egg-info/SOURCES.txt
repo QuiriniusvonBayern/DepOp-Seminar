@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+hilfsfunktionen.egg-info/PKG-INFO
+hilfsfunktionen.egg-info/SOURCES.txt
+hilfsfunktionen.egg-info/dependency_links.txt
+hilfsfunktionen.egg-info/requires.txt
+hilfsfunktionen.egg-info/top_level.txt
+tests/test_modul_1.py

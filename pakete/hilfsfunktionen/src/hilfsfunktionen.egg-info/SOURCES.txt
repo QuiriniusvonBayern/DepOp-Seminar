@@ -1,0 +1,13 @@
+LICENSE
+README.md
+pyproject.toml
+src/hilfsfunktionen/__init__.py
+src/hilfsfunktionen/config.py
+src/hilfsfunktionen/db.py
+src/hilfsfunktionen/formating.py
+src/hilfsfunktionen/model_training.py
+src/hilfsfunktionen.egg-info/PKG-INFO
+src/hilfsfunktionen.egg-info/SOURCES.txt
+src/hilfsfunktionen.egg-info/dependency_links.txt
+src/hilfsfunktionen.egg-info/top_level.txt
+tests/test_modul_1.py
