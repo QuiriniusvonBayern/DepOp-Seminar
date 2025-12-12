@@ -19,8 +19,8 @@ def format_title(info, items_per_line=4):
     
     return "\n".join(lines)
 
-def extract_words_and_vectors(vektor_series, filter, prefix="key_"):
-    words = list(vektor_series.wv.key_to_index.keys())
+def extract_words_and_vectors(vector_series, filter, prefix="key_"):
+    words = list(vector_series.wv.key_to_index.keys())
     if filter:
         return [w for w in words if not w.startswith(prefix)]
     else:
@@ -32,7 +32,7 @@ def visualize_all_avr_sent(models_list: list, method: str="tsne", max_cols: int=
     Visualisiert alle Modelle in einem automatisch angepassten Grid
     
     Args:
-        models_list: Liste von [vektor_series, info_dict] Paaren
+        models_list: Liste von [vector_series, info_dict] Paaren
         max_cols: Maximale Anzahl an Spalten
     """
     n_models = len(models_list)
@@ -59,17 +59,18 @@ def visualize_all_avr_sent(models_list: list, method: str="tsne", max_cols: int=
     else:
         axes = axes.flatten()
     
-    for idx, (vektor_series, info) in enumerate(models_list):
+    for idx, (vector_df, info) in enumerate(models_list):
         if idx < len(axes):
             ax = axes[idx]
-            # t-SNE Berechnung
-            vektor_series = vektor_series.iloc[:nr_of_vectors]
-            vectors = np.vstack(vektor_series.values)
+            vector_df = vector_df.iloc[:nr_of_vectors]
+            word_series = vector_df.get('key')
+            vector_series = vector_df.get('vector')
+            vectors = np.vstack(vector_series.values)
+            churn_mask = vector_df['churned'].values
             match method:
                 case "tsne":
-                    tsne = TSNE(n_components=2, random_state=42, perplexity=min(5, len(vektor_series)-1))
+                    tsne = TSNE(n_components=2, random_state=42, perplexity=min(5, len(vector_series)-1))
                     reduced = tsne.fit_transform(vectors)
-                    print("TSNE done")
                 case "umap":
                     reducer = umap.UMAP()
                     reduced = reducer.fit_transform(vectors)
@@ -77,16 +78,18 @@ def visualize_all_avr_sent(models_list: list, method: str="tsne", max_cols: int=
                     raise ValueError(f"Unbekannte Methode: {method}")
             
             # Plot
-            scatter = ax.scatter(reduced[:, 0], reduced[:, 1], alpha=0.7, s=60)
-            
+            reduced_churned = reduced[churn_mask]
+
+            ax.scatter(reduced[:, 0], reduced[:, 1], alpha=0.7, s=60, c='green')
+            ax.scatter(reduced_churned[:, 0], reduced_churned[:, 1], alpha=0.7, s=60, c='red')
             # Annotationen
-            for i, word in enumerate(vektor_series.keys()):
+            for i, word in enumerate(word_series.values):
                 ax.annotate(word, xy=(reduced[i, 0], reduced[i, 1]), 
                             fontsize=6, alpha=0.8, 
                             xytext=(5, 5), textcoords='offset points')
             
             # Titel mit Modell-Informationen
-            title = f"vektor_series {idx+1}\n"
+            title = f"vector_series {idx+1}\n"
             
             title = format_title(info, items_per_line=3)
             ax.set_title(title, fontsize=10)
@@ -98,7 +101,6 @@ def visualize_all_avr_sent(models_list: list, method: str="tsne", max_cols: int=
     
     #plt.tight_layout()
     plt.show()
-    print("Erste Darstellung erfolgreich.")
 
 
 def visualize_model_comparison(models_list):
@@ -118,7 +120,7 @@ def visualize_model_comparison(models_list):
     if n_rows == 1:
         axes = axes.reshape(1, -1)
     
-    for idx, (vektor_series, info) in enumerate(models_list):
+    for idx, (vector_series, info) in enumerate(models_list):
         # Position berechnen
         row = idx // n_cols
         col = idx % n_cols
@@ -126,11 +128,11 @@ def visualize_model_comparison(models_list):
         ax = axes[row, col]
         
         # Verfügbare Wörter
-        available_words = [w for w in comparison_words if w in vektor_series.wv.key_to_index]
+        available_words = [w for w in comparison_words if w in vector_series.wv.key_to_index]
         
         if len(available_words) >= 3:
             # Ähnlichkeitsmatrix berechnen
-            vectors = np.array([vektor_series.wv[w] for w in available_words])
+            vectors = np.array([vector_series.wv[w] for w in available_words])
             similarity_matrix = cosine_similarity(vectors)
             
             # Heatmap plotten
@@ -142,7 +144,7 @@ def visualize_model_comparison(models_list):
                        ax=ax, cbar=False)
             
             # Titel mit Modell-Informationen
-            title = f"vektor_series {idx+1}\n"
+            title = f"vector_series {idx+1}\n"
             keys = list(info.keys())
             
             for i, key in enumerate(keys):
@@ -159,7 +161,7 @@ def visualize_model_comparison(models_list):
                    ha='center', va='center', transform=ax.transAxes)
             
             # Titel auch für Modelle ohne Vergleich
-            title = f"vektor_series {idx+1}\n"
+            title = f"vector_series {idx+1}\n"
             keys = list(info.keys())
             
             for i, key in enumerate(keys):
@@ -221,11 +223,11 @@ def print_avr_sent_metrics(models_list):
 
     # Werte vorbereiten
     table_values = []
-    for vektor_series, info in models_list:
+    for vector_series, info in models_list:
         row = {}
         for key in all_keys:
             if key == "Vocab Size":
-                row[key] = str(len(vektor_series.index))
+                row[key] = str(len(vector_series.index))
             else:
                 row[key] = str(info.get(key, "N/A"))
         table_values.append(row)
@@ -238,7 +240,7 @@ def print_avr_sent_metrics(models_list):
         col_widths[key] = max(len(shortened_keys[key]), max_value_len)
 
     # Kopfzeile
-    header = f"{'vektor_series':<5}  " + "  ".join(
+    header = f"{'vector_series':<5}  " + "  ".join(
         f"{shortened_keys[key]:<{col_widths[key]}}" for key in all_keys
     )
     print(header)

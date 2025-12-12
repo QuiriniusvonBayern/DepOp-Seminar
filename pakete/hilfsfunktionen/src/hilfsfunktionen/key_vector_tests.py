@@ -1,3 +1,5 @@
+import pandas as pd
+
 # ------- Deinition of Tests to compare Key-Vectors -----------
 def get_key_values(key, filter, prefix="key", df_with_keys=None):
     values_with_keys = df_with_keys.iloc[key] #mit Keys
@@ -16,7 +18,40 @@ def compare_lists(list1, list2):
         output += f"(Position {pos} : '{a}' )"
     return output, anzahl_paare
 
+def has_churned(customer_index: int, df: pd.DataFrame):
+    """
+    Check if a customer has turned based on their row index.
 
+    Prameters:
+    ----------
+    customer_index : int
+        Zero_based index of constomer row in the dataframe.
+    df : pd.DataFrame
+        DataFrame containing cusomer data with 'churn'-column
+        
+    Returns:
+    --------
+    bool
+        True if customer has churned (churn == 'Churn_Yes'), False otherwise
+
+    Raises:
+    -------
+    IndexError
+        if customer_index out of bounds
+    ColumnError
+        If 'churn' column does not exist
+    """
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df-1)}]")
+    if 'churn' not in df.columns:
+        raise IndexError(f"Column 'churn' not in the DataFrame.")
+
+    churned_value = df.iloc[customer_index]['churn']
+
+    if pd.isna(churned_value):
+        return False
+    
+    return "Churn_Yes" == churned_value
 
 # ---------------------------------------------------
 # Key-Strukturprüfung
