@@ -18,7 +18,11 @@ services:
       - ./data:/data
       - .:/app
       - ./pakete/hilfsfunktionen:/app/pakete/hilfsfunktionen
-    command: jupyter lab --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/workspace
+    command: >
+      sh -c "
+      pip install -e /app/pakete/hilfsfunktionen &&
+      jupyter lab --ip=0.0.0.0 --no-browser --allow-root --notebook-dir=/workspace
+      "
     
 
   postgres-db:
