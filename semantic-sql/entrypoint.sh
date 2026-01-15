@@ -10,7 +10,7 @@ until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
     sleep 2
 done
 
-pip install -e /app/pakete/hilfsfunktionen
+
 
 echo "PostgreSQL ist erreichbar."
 
