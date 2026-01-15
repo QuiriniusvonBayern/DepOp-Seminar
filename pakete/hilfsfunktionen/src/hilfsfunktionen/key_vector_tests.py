@@ -81,7 +81,7 @@ def check_key_structure(model, keys, verbose, df_with_keys):
                 if verbose:
                     print(f"  {w:30s} {s:.4f}")
                     print(f"\nWerte in Zeile {k}:")
-                    print(get_key_values(int(w.replace("key_", "")), True))
+                    print(get_key_values(int(w.replace("key_", "")), True, df_with_keys=df_with_keys))
            
             if verbose:           
                 print("Beurteilung:", comments)
@@ -105,6 +105,7 @@ def run_full_quality_check_key(model_list, verbose, df_with_keys=None):
     success[f"Key-Struktur: \n"] = key_ok
 
     # Ausgabe
-    for x, y in success.items():
-        print(x, y)
+    if verbose:
+        for x, y in success.items():
+            print(x, y)
     return success
