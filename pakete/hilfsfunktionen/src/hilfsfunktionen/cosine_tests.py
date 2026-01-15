@@ -110,9 +110,10 @@ def find_global_most_similar(model, verbose, n=5, df_with_keys=None):
 
     
 def run_full_vector_test(model_list, verbose, very_verbose=False, df_with_keys=None):
-    print("\n################################################")
-    print("             PROXIMITY AVERAGE TEST")
-    print("################################################\n")
+    if verbose:
+        print("\n################################################")
+        print("             PROXIMITY AVERAGE TEST")
+        print("################################################\n")
     model = model_list[0]
     success = {}
 
@@ -125,38 +126,46 @@ def run_full_vector_test(model_list, verbose, very_verbose=False, df_with_keys=N
         # 2. Most Similar pair
         success_text = find_global_most_similar(model, verbose=verbose, df_with_keys=df_with_keys)
         success[f"Most similar:"] = success_text
-    for x, y in success.items():
-        print(x, y)
 
-    print("\n################################################")
-    print("           PROXIMITY TOPN AVERAGE TEST")
-    print("################################################\n")
+    if verbose:
+        for x, y in success.items():
+            print(x, y)
+
+    if verbose:
+        print("\n################################################")
+        print("           PROXIMITY TOPN AVERAGE TEST")
+        print("################################################\n")
     success = {}
     success_text = evaluate_most_similar_proximity_topn_avg(model, [
         1,5,500,9999
     ], verbose=verbose, df_with_keys=df_with_keys)
     success[f"Most similar to Key (topn):"] = success_text
-    for x, y in success.items():
-        print(x, y)
-
-    print("\n################################################")
-    print("           PROXIMITY SUBSET PROXIMITY TEST")
-    print("################################################\n")
+    
+    if verbose:
+        for x, y in success.items():
+            print(x, y)
+    if verbose:
+        print("\n################################################")
+        print("           PROXIMITY SUBSET PROXIMITY TEST")
+        print("################################################\n")
     success = {}
     success_text = evaluate_most_similar_proximity_topn_avg(model, [
         1,5,500,9999
     ], verbose=verbose, df_with_keys=df_with_keys, method="subset_proximity_avg")
     success[f"Most similar to Key (topn):"] = success_text
-    for x, y in success.items():
-        print(x, y)
-
-    print("\n################################################")
-    print("           PROXIMITY AVERAGE ALL TEST")
-    print("################################################\n")
+    if verbose:
+        for x, y in success.items():
+            print(x, y)
+    if verbose:
+        print("\n################################################")
+        print("           PROXIMITY AVERAGE ALL TEST")
+        print("################################################\n")
     success = {}
     success_text = evaluate_most_similar_proximity_topn_avg(model, [
         1,5,500,9999
     ], verbose=verbose, df_with_keys=df_with_keys, method="proximity_avg_all")
     success[f"Most similar to Key (topn):"] = success_text
-    for x, y in success.items():
-        print(x, y)
+
+    if verbose:
+        for x, y in success.items():
+            print(x, y)

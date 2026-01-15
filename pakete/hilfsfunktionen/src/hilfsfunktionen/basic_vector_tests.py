@@ -1,10 +1,9 @@
-# -------- Tests to compare word vectors ------------
+# basic_vector_tests.py
 # ---------------------------------------------------
 # Hilfsfunktionen
 # ---------------------------------------------------
 def interpret_similarity(token_pair, value):
     t1, t2 = token_pair
-
     expected_ranges = {
         ("Gender_Female", "Gender_Male"): (0.30, 0.90),
         ("Credit_Score_Fair", "Credit_Score_Good"): (0.25, 0.85),
@@ -14,183 +13,129 @@ def interpret_similarity(token_pair, value):
     }
 
     if (t1, t2) not in expected_ranges:
-        return "Keine Referenzwerte vorhanden.", False
+        return "Keine Referenz", False
 
     low, high = expected_ranges[(t1, t2)]
-
-    if value < low:
-        return f"➡ WARNUNG: Wert zu niedrig (erwartet: {low} bis {high})", False
-    if value > high:
-        return f"➡ WARNUNG: Wert zu hoch (erwartet: {low} bis {high})", False
-
-    return f"✔ OK (innerhalb erwarteter Range {low}–{high})", True
+    if value < low: return "Zu niedrig", False
+    if value > high: return "Zu hoch", False
+    return "OK", True
 
 def interpret_neighbors(token, neighbors, test, test_range):
-    comments = []
-    success = True
-
-    # -----------------------------
-    # 1. Gruppierungslogik nach Präfix
-    # -----------------------------
+    # Gibt nun direkt die Anzahl der korrekten Matches zurück
     if test != "none" and token.startswith(f"{test}_"):
-
         expected_prefix = f"{test}_"
         subset = neighbors[:min(test_range, len(neighbors))]
-
-        all_correct = True
-        for w, _ in subset:
-            if not w.startswith(expected_prefix):
-                comments.append(
-                    f"➡ WARNUNG: Nachbar {w} entspricht nicht der erwarteten Gruppe ({test})."
-                )
-                all_correct = False
-                success = False
-
-        if all_correct:
-            comments.append("✔ OK: Token gruppieren sich erwartungsgemäß.")
-    return comments, success
-
-
+        
+        matches = sum(1 for w, _ in subset if w.startswith(expected_prefix))
+        total_checked = len(subset)
+        
+        return matches, total_checked
+    return 0, 0
 
 # ---------------------------------------------------
 # Semantische Ähnlichkeit prüfen
 # ---------------------------------------------------
-
 def check_token_similarity(model, token_pairs, verbose):
-    if verbose:
-        print("\n============================================")
-        print(" SEMANTISCHE ÄHNLICHKEITEN (COSINE CHECK)")
-        print("============================================")
-
-    success_counter = 0
-
+    results = []
+    
     for t1, t2 in token_pairs:
         try:
-            sim = model.wv.similarity(t1, t2)
+            sim = float(model.wv.similarity(t1, t2))
+            msg, passed = interpret_similarity((t1, t2), sim)
             
-
-            judgement, ok = interpret_similarity((t1, t2), sim)
+            results.append({
+                "pair": f"{t1}-{t2}",
+                "similarity": sim,
+                "passed": passed,
+                "msg": msg
+            })
+            
             if verbose:
-                print(f"\n{t1} ↔ {t2} = {sim:.4f}")
-                print("Beurteilung:", judgement)
-
-            if ok:
-                success_counter += 1
+                print(f"{t1} ↔ {t2} = {sim:.4f} ({msg})")
 
         except KeyError:
-            print(f"{t1} oder {t2} nicht im Vokabular")
+            if verbose: print(f"{t1} oder {t2} fehlen.")
+            results.append({
+                "pair": f"{t1}-{t2}",
+                "similarity": None,
+                "passed": False,
+                "msg": "Missing Token"
+            })
 
-    return success_counter
-
-
+    return results
 
 # ---------------------------------------------------
 # Nachbaranalyse
 # ---------------------------------------------------
-
 def check_neighbors(model, tokens, test, test_range, verbose, topn=10):
-    if verbose:
-        print("\n============================================")
-        print(" NEAREST-NEIGHBOR CHECK")
-        print(f" {test.upper()}")
-        print("============================================")
-
-    success_counter = 0
-
+    results = []
+    
     for t in tokens:
-        if verbose:
-            print(f"\nTop-{topn} Nachbarn für {t}:")
         try:
             nn = model.wv.most_similar(t, topn=topn)
+            matches, checked = interpret_neighbors(t, nn, test, test_range)
+            
+            # Wir speichern die Quote (z.B. 1.0 = 100% korrekt)
+            score = matches / checked if checked > 0 else 0
+            
+            results.append({
+                "token": t,
+                "category": test,
+                "matches": matches,
+                "checked_range": checked,
+                "score": score
+            })
+            
             if verbose:
-                for w, s in nn:
-                    print(f"  {w:30s} {s:.4f}")
-
-            comments, ok = interpret_neighbors(t, nn, test, test_range)
-
-            if ok:
-                success_counter += 1
-            if verbose:
-                for c in comments:
-                    print("Beurteilung:", c)
+                print(f"{t}: {matches}/{checked} Nachbarn korrekt.")
 
         except KeyError:
-            print(f"{t} nicht im Vokabular")
-
-    return f"{success_counter} von {len(tokens)} Erfolgreich"
+            if verbose: print(f"{t} nicht gefunden.")
+    
+    return results
 
 # ---------------------------------------------------
 # Gesamter Qualitätscheck
 # ---------------------------------------------------
-
 def run_full_quality_check(model_list, verbose):
-    print("\n################################################")
-    print("        AUTOMATISCHER W2V QUALITY CHECK")
-    print("               Model Parameters:       ")
-    print(f"Vektorraumgröße = {model_list[1]['Vector Size']} Fenstergröße  = {model_list[1]['Window']} Algorithmus = {model_list[1]['Algorithmus']}")
-    print(f"         Epochen = {model_list[1]['Epochs']} Anzahl der Sätze = {model_list[1]['Satzanzahl']} Länge der Sätze = {model_list[1]['Satzlänge']}")
-    print("################################################\n")
+    if verbose:
+        print("\n################################################")
+        print("        AUTOMATISCHER W2V QUALITY CHECK")
+        print("               Model Parameters:       ")
+        print(f"Vektorraumgröße = {model_list[1]['Vector Size']} Fenstergröße  = {model_list[1]['Window']} Algorithmus = {model_list[1]['Algorithmus']}")
+        print(f"         Epochen = {model_list[1]['Epochs']} Anzahl der Sätze = {model_list[1]['Satzanzahl']} Länge der Sätze = {model_list[1]['Satzlänge']}")
+        print("################################################\n")
+
+    if verbose:
+        print("Running Basic Quality Checks...")
 
     model = model_list[0]
-    success = {}
+    # Wir sammeln alles in einem Dictionary
+    data = {
+        "semantic_similarity": [],
+        "neighbors": []
+    }
 
     # 1. Semantische Erwartungspaare
-    success_counter = check_token_similarity(model, [
+    data["semantic_similarity"] = check_token_similarity(model, [
         ("Gender_Female", "Gender_Male"),
         ("Credit_Score_Fair", "Credit_Score_Good"),
         ("Churn_Yes", "Churn_No"),
         ("Country_France", "Country_Germany"),
         ("Country_France", "Country_Spain"),
     ], verbose=verbose)
-    success["Semantische Erwartungspaare: "] = f"{success_counter} von 5 Erfolgreich"
 
-    # 2. Länder-Nachbarn
-    success["Länder-Nachbarn: "] = check_neighbors(
-        model, 
-        ["Country_France", "Country_Germany", "Country_Spain"], 
-        test="Country", 
-        test_range=2, 
-        verbose=verbose
-    )
+    # 2. Nachbar-Tests (Sammeln in einer Liste)
+    neighbor_configs = [
+        (["Country_France", "Country_Germany", "Country_Spain"], "Country", 2),
+        (["Age_Young_Adults", "Age_Adults_their_Prime", "Age_Middle_aged"], "Age", 4),
+        (["Salary_Very_low", "Salary_Below_average", "Salary_Very_high"], "Salary", 6),
+        (["Credit_Score_Poor", "Credit_Score_Good", "Credit_Score_Excellent"], "Credit_Score", 4),
+        (["Churn_Yes", "Churn_No"], "Churn", 1)
+    ]
 
-    # 3. Alters-Nachbarn
-    success["Alters-Nachbarn: "] = check_neighbors(
-        model,
-        ["Age_Young_Adults", "Age_Adults_in_their_Prime", "Age_Middle_aged"],
-        test="Age",
-        test_range=4, 
-        verbose=verbose
-    )
+    for tokens, category, rng in neighbor_configs:
+        res = check_neighbors(model, tokens, test=category, test_range=rng, verbose=verbose)
+        data["neighbors"].extend(res)
 
-    # 4. Gehalts-Nachbarn
-    success["Gehalts-Nachbarn: "] = check_neighbors(
-        model,
-        ["Salary_Very_low", "Salary_Below_average", "Salary_Very_high"],
-        test="Salary",
-        test_range=6, 
-        verbose=verbose
-    )
-
-    # 5. Credit_Score-Nachbarn
-    success["Credit_Score-Nachbarn: "] = check_neighbors(
-        model,
-        ["Credit_Score_Poor", "Credit_Score_Good", "Credit_Score_Excellent"],
-        test="Credit_Score",
-        test_range=4, 
-        verbose=verbose
-    )
-
-    # 6. Churn-Nachbarn
-    success["Churn-Nachbarn: "] = check_neighbors(
-        model,
-        ["Churn_Yes", "Churn_No"],
-        test="Churn",
-        test_range=1, 
-        verbose=verbose
-    )
-
-    # Ausgabe
-    for x, y in success.items():
-        print(x, y)
-
-    return success
+    return data

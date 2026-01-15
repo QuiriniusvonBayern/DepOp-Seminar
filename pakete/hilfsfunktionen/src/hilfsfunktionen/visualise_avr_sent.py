@@ -155,7 +155,7 @@ def visualize_model_comparison(models_list):
             title = title.rstrip(', ')  
             ax.set_title(title, fontsize=10)
             plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-        
+
         else:
             ax.text(0.5, 0.5, "Nicht genug Wörter\nfür Vergleich", 
                    ha='center', va='center', transform=ax.transAxes)
