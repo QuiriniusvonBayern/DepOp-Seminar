@@ -402,6 +402,39 @@ class ExperimentRunner:
             
             return models
 
+
+    def run_grid_search(
+        self,
+        sentences: List[List[str]],
+        param_grid: Dict[str, List[Any]],
+        num_sentences: int,
+        verbose: bool = False
+    ):
+        results = []
+
+        grid_keys = list(param_grid.keys())
+        grid_values = list(param_grid.values())
+
+        for values in product(*grid_values):
+            grid_params = dict(zip(grid_keys, values))
+
+            # Base-Config als Ausgangspunkt
+            config_dict = self.base_config.to_dict()
+            config_dict.update(grid_params)
+
+            config = ModelConfig(**config_dict)
+
+            model, metadata = self.run_single_experiment(
+                sentences=sentences,
+                config=config,
+                num_sentences=num_sentences,
+                verbose=verbose
+            )
+
+            results.append((model, metadata))
+
+        return results
+
     def create_many_models(
         self,
         sentences: List[List[str]],

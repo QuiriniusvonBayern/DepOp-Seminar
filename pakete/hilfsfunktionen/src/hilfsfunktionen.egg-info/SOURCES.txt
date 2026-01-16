@@ -3,7 +3,6 @@ README.md
 pyproject.toml
 src/hilfsfunktionen/__init__.py
 src/hilfsfunktionen/basic_vector_tests.py
-src/hilfsfunktionen/basic_vector_tests_alt.py
 src/hilfsfunktionen/collect_test_data.py
 src/hilfsfunktionen/config.py
 src/hilfsfunktionen/cosine_funktions.py
@@ -11,7 +10,6 @@ src/hilfsfunktionen/cosine_tests.py
 src/hilfsfunktionen/db.py
 src/hilfsfunktionen/formating.py
 src/hilfsfunktionen/key_vector_tests.py
-src/hilfsfunktionen/model_training copy.py
 src/hilfsfunktionen/model_training.py
 src/hilfsfunktionen/sentence_vectors.py
 src/hilfsfunktionen/visualise_avr_sent.py
