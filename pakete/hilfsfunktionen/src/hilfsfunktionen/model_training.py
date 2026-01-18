@@ -503,7 +503,7 @@ class ExperimentRunner:
             "sample": ("sample", samples),
             "hs": ("hs", hs_values),
             "alpha": ("alpha", alphas),
-            "seed": ("seed", seeds),
+            #"seed": ("seed", seeds),
         }
         
         models = {}
