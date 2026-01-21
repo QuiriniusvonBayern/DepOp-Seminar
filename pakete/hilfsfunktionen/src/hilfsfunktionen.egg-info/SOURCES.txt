@@ -1,6 +1,7 @@
 LICENSE
 README.md
 pyproject.toml
+src/hilfsfunktionen/Semantic_SQL_Model_Quality_Score_tests copy.py
 src/hilfsfunktionen/Semantic_SQL_Model_Quality_Score_tests.py
 src/hilfsfunktionen/__init__.py
 src/hilfsfunktionen/collect_test_data.py

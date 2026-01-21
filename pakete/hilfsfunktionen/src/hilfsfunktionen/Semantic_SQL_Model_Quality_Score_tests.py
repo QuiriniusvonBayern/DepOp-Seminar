@@ -1,5 +1,6 @@
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
+from sklearn.metrics import silhouette_score
 import numpy as np
 
 def get_key_values(key, filter, prefix="key", df_with_keys=None):
@@ -18,51 +19,143 @@ def get_key_values(key, filter, prefix="key", df_with_keys=None):
     
     return result
 
-def neighborhood_discriminability_test(model, k=10, verbose=False):
+def get_key_values_by_column(key, filter, prefix="key", df_with_keys=None, include_cols=None):
+    row = df_with_keys.iloc[key]
+    result = []
 
-    semantic_labels = get_semantic_labels()
-
-    
-    tokens, vectors, labels = extract_vectors_from_model(model[0], semantic_labels)
-
-    sim_matrix = cosine_similarity(vectors)
-    np.fill_diagonal(sim_matrix, -1.0)  # Selbstähnlichkeit entfernen
-
-    intra_distances = []
-    inter_distances = []
-
-    for i in range(len(tokens)):
-        neighbor_ids = np.argsort(sim_matrix[i])[-k:]
-
-        for j in neighbor_ids:
-            distance = 1 - sim_matrix[i, j]
-            if labels[i] == labels[j]:
-                intra_distances.append(distance)
-            else:
-                inter_distances.append(distance)
-
-    score = np.mean(inter_distances) / np.mean(intra_distances)
-    
-
-    if verbose:
-        print(f"Model {model}: NDR = {score:.4f}")
-
-    return score
-
+    for col, value in row.items():
+        if include_cols is not None and col not in include_cols:
+            continue
+        if filter and str(value).startswith(prefix):
+            continue
+        result.append(f"{col}={value}")
+    return result
 
 
 def extract_vectors_from_model(model, semantic_labels):
+    """Extrahiert Vektoren und wandelt Labels in numerische Werte um."""
     tokens = []
     vectors = []
-    labels = []
-
+    categorical_labels = []  # Kategorische Labels sammeln
+    
     for token, label in semantic_labels.items():
         if token in model.wv:
             tokens.append(token)
             vectors.append(model.wv[token])
-            labels.append(label)
+            categorical_labels.append(label)
+    
+    le = None
 
-    return tokens, np.vstack(vectors), labels
+    if categorical_labels:
+        le = LabelEncoder()
+        numeric_labels = le.fit_transform(categorical_labels)
+    else:
+        numeric_labels = np.array([])
+    
+    return tokens, np.vstack(vectors) if vectors else np.array([]), numeric_labels, le
+
+def neighborhood_discriminability_test_silhouette(model, verbose=False):
+    """
+    Ersetzt die alte ND-Ratio durch den Silhouette-Koeffizienten.
+    Prüft, wie gut die Vektoren innerhalb ihrer semantischen Klassen 
+    gruppiert sind im Vergleich zu anderen Klassen.
+    """
+    # ACHTUNG: Ihr Code verwendet model[0] - ist model eine Liste/Tupel?
+    # Wenn model das Word2Vec-Modell direkt ist, verwenden Sie es direkt:
+    if isinstance(model, (list, tuple)):
+        wv_model = model[0]  # Wenn model eine Liste/Tupel ist
+    else:
+        wv_model = model  # Wenn model direkt das Modell ist
+    
+    # 1. Labels und Vektoren extrahieren
+    semantic_labels = get_semantic_labels()
+    
+    # Jetzt mit Label-Kodierung
+    tokens, vectors, numeric_labels, label_encoder = extract_vectors_from_model(
+        wv_model, semantic_labels
+    )
+    
+    # Überprüfen, ob wir genug Daten haben
+    if len(vectors) == 0:
+        if verbose: 
+            print("ND Warnung: Keine Vektoren gefunden.")
+        return 0.0
+    
+    if len(np.unique(numeric_labels)) < 2:
+        if verbose: 
+            print(f"ND Warnung: Nur {len(np.unique(numeric_labels))} Klasse(n) gefunden. "
+                  f"Silhouette benötigt mindestens 2 Klassen.")
+        return 0.0
+    
+    if len(numeric_labels) < 3:
+        if verbose:
+            print(f"ND Warnung: Nur {len(numeric_labels)} Samples gefunden. "
+                  f"Silhouette benötigt mindestens 3 Samples.")
+        return 0.0
+    
+    # 2. Silhouette Score berechnen
+    try:
+        # Verwende 'cosine' als Distanzmaß
+        score = silhouette_score(vectors, numeric_labels, metric='cosine')
+        
+        if verbose:
+            print(f"Neighborhood Discriminability (Silhouette): {score:.4f}")
+            print(f"Anzahl Samples: {len(vectors)}")
+            print(f"Anzahl Klassen: {len(np.unique(numeric_labels))}")
+            print(f"Klassen: {label_encoder.classes_}")
+            
+            # Zusätzliche Diagnose-Informationen
+            unique, counts = np.unique(numeric_labels, return_counts=True)
+            class_counts = {label_encoder.inverse_transform([u])[0]: int(c) for u, c in zip(unique, counts)}
+            print(f"Klassenverteilung: {class_counts}")
+
+        
+        # Silhouette Score liegt zwischen -1 und 1
+        # Negative Scores sind schlecht, also normalisieren wir auf [0, 1]
+        nd_norm = max(0, score)
+        
+        return float(nd_norm)
+        
+    except Exception as e:
+        if verbose:
+            print(f"Fehler bei Silhouette-Berechnung: {e}")
+        return 0.0
+
+
+
+# Hilfsfunktion zur Überprüfung Ihres Models
+def check_model_vocabulary(model):
+    """Überprüft, welche Wörter aus Ihren Labels im Modell vorhanden sind."""
+    if isinstance(model, (list, tuple)):
+        wv_model = model[0]
+    else:
+        wv_model = model
+    
+    semantic_labels = get_semantic_labels()
+    
+    print("VOKABULAR-ÜBERPRÜFUNG")
+    print("=" * 60)
+    
+    # Prüfe jedes Label-Wort
+    found = []
+    missing = []
+    
+    for token in semantic_labels.keys():
+        if token in wv_model.wv:
+            found.append(token)
+        else:
+            missing.append(token)
+    
+    print(f"Gefunden: {len(found)}/{len(semantic_labels)} Wörtern")
+    print(f"Fehlend: {len(missing)}/{len(semantic_labels)} Wörtern")
+    
+    if missing:
+        print("\nFehlende Wörter (erste 10):")
+        for token in missing[:10]:
+            label = semantic_labels[token]
+            print(f"  {token} -> {label}")
+    
+    return found, missing
 
 def get_semantic_labels():
     return {
@@ -178,25 +271,25 @@ def rank_stability_test_average(model_list, verbose=False, max_anchors=100):
     return average_result, rs_5, rs_10, rs_20
 
 def rank_stability_test(anchor_indices, seed_runs, k, verbose=False):
-
     jaccards = []
-
+    
     for anchor_idx in anchor_indices:
         neigh_sets = []
-
+        
         for seed, vectors in seed_runs:
             neigh = top_k_neighbors_rs(anchor_idx, vectors, k)
             neigh_sets.append(set(neigh))
-
-        base = neigh_sets[0]
-        for other in neigh_sets[1:]:
-            jaccards.append(jaccard_index(base, other))
-
-    rs_score = float(np.mean(jaccards))
-
+        
+        # ALLE paarweisen Vergleiche durchführen
+        for i in range(len(neigh_sets)):
+            for j in range(i + 1, len(neigh_sets)):
+                jaccards.append(jaccard_index(neigh_sets[i], neigh_sets[j]))
+    
+    rs_score = float(np.mean(jaccards)) if jaccards else 0.0
+    
     if verbose:
         print(f"Rank Stability (k={k}): {rs_score:.4f}")
-
+    
     return rs_score
 
 def select_anchor_vectors(seed_runs, max_anchors=100):
@@ -218,27 +311,113 @@ def jaccard_index(a, b):
 
 
 
-def feature_coherence_test(model_list, verbose=False, k=10, df_with_keys=None):
-    vectors, rows = get_vectors_and_rows(model_list, df_with_keys)
+def get_vectors_and_rows_for_seed(model_list, df_with_keys, seed_target):
+    sentence_vectors, rows = [], []
+    for seed, vectors in model_list["data"]:
+        if seed == seed_target:
+            for index, vector in zip(vectors["index"], vectors["vector"]):
+                # Prüfen, ob Zeile index wirklich key_{index+1} enthält
+                row = df_with_keys.iloc[index].astype(str).tolist()
+                assert any(v == f"key_{index+1}" for v in row), f"Mismatch at index={index}"
+                sentence_vectors.append(vector)
+                fc_cols = ["credit_card", "gender", "balance", "credit_score", "churn"]
 
-    sim_matrix = cosine_similarity(vectors)
-    np.fill_diagonal(sim_matrix, -1)
+                rows.append(get_key_values_by_column(index, True, prefix="key", df_with_keys=df_with_keys, include_cols=fc_cols))
 
-    feature_matrix = MultiLabelBinarizer().fit_transform(rows)
+    return np.array(sentence_vectors), rows
 
-    scores = []
-    for i in range(len(vectors)):
-        neighbors = np.argsort(sim_matrix[i])[::-1][:k]
-        scores.append(
-            compute_feature_overlap_fast(i, neighbors, feature_matrix)
-        )
+def feature_coherence_test(
+    model_list,
+    verbose=False,
+    k=10,
+    df_with_keys=None,
+    normalize=True,
+    clip_normalized=False,
+    rng_seed=42,
+    return_details=False
+):
+    """
+    Raw FC:
+      FC_global = mean_seed mean_r mean_{n in N_k(r)} Jaccard(F(r), F(n))
 
-    fc_score = float(np.mean(scores))
+    Random Baseline:
+      FC_random = mean_seed mean_r mean_{n in Random_k(r)} Jaccard(F(r), F(n))
 
+    Normalized (Lift):
+      FC_norm = (FC_knn - FC_random) / (1 - FC_random)
+
+    Notes:
+    - Raw FC und FC_random liegen in [0,1].
+    - FC_norm kann negativ sein (schlechter als Zufall). Mit clip_normalized=True wird auf [0,1] gekappt.
+    - Voraussetzung: vectors["index"] muss 0-basierte Positionsindizes in df_with_keys sein (passt zu df_with_keys.iloc[key]).
+    """
+
+    seed_fc_scores = []
+    seed_rand_scores = []
+    #verbose=True
+
+    for seed, _ in model_list["data"]:
+        vectors, rows = get_vectors_and_rows_for_seed(model_list, df_with_keys, seed)
+        n = len(vectors)
+
+        # Für random neighbors ohne replacement braucht man mindestens k+1 Instanzen
+        if n < k + 1:
+            continue
+
+        # Similarity-Matrix für KNN
+        sim_matrix = cosine_similarity(vectors)
+        np.fill_diagonal(sim_matrix, -1)
+
+        # Feature-Matrix (binarisiert)
+        feature_matrix = MultiLabelBinarizer().fit_transform(rows)
+
+        # Reproduzierbarer RNG pro Seed
+        rng = np.random.default_rng(int(rng_seed) + int(seed))
+
+        all_indices = np.arange(n)
+        fc_per_instance = []
+        rand_per_instance = []
+
+        for i in range(n):
+            # --- KNN neighbors ---
+            neighbors = np.argsort(sim_matrix[i])[::-1][:k]
+            fc_per_instance.append(compute_feature_overlap_fast(i, neighbors, feature_matrix))
+
+            # --- Random baseline neighbors ---
+            candidates = all_indices[all_indices != i]
+            rand_neighbors = rng.choice(candidates, size=k, replace=False)
+            rand_per_instance.append(compute_feature_overlap_fast(i, rand_neighbors, feature_matrix))
+
+        seed_fc_scores.append(float(np.mean(fc_per_instance)))
+        seed_rand_scores.append(float(np.mean(rand_per_instance)))
+
+    fc_knn = float(np.mean(seed_fc_scores)) if seed_fc_scores else 0.0
+    fc_random = float(np.mean(seed_rand_scores)) if seed_rand_scores else 0.0
+
+    if not normalize:
+        if verbose:
+            print(f"Feature Coherence raw (k={k}, seeds={len(seed_fc_scores)}): {fc_knn:.4f}")
+            print(f"Feature Coherence random baseline: {fc_random:.4f}")
+        return (fc_knn, fc_random) if return_details else fc_knn
+
+    denom = 1.0 - fc_random
+    if denom <= 0:
+        # Extremfall: Baseline == 1.0, dann ist Normalisierung nicht sinnvoll.
+        fc_norm = 0.0
+    else:
+        fc_norm = (fc_knn - fc_random) / denom
+
+    if clip_normalized:
+        fc_norm = float(np.clip(fc_norm, 0.0, 1.0))
 
     if verbose:
-        print(f"Feature Coherence (k={k}): {fc_score:.4f}")
-    return fc_score
+        print(f"Feature Coherence raw (k={k}, seeds={len(seed_fc_scores)}): {fc_knn:.4f}")
+        print(f"Feature Coherence random baseline: {fc_random:.4f}")
+        print(f"Feature Coherence normalized: {fc_norm:.4f}")
+
+    return (float(fc_norm), fc_knn, fc_random) if return_details else float(fc_norm)
+
+
 
 
 def get_vectors_and_rows(model_list, df_with_keys=None):

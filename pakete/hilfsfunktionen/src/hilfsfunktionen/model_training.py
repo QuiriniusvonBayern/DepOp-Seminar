@@ -472,16 +472,16 @@ class ExperimentRunner:
         """
         # Default-Werte setzen
         if vector_sizes is None:
-            vector_sizes = [20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 
-                          85, 90, 95, 100, 110, 120, 130, 140, 150, 180, 225, 
-                          250, 275, 300]
+            vector_sizes = [20, 30, 40, 50, 60, 80, 
+                            100, 120, 140, 150, 160, 180, 225, 
+                          250, 275, 300, 350, 400]
         if window_sizes is None:
             window_sizes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
                           16, 17, 18, 20]
         if num_epochs is None:
-            num_epochs = [3, 5, 7, 10, 13, 15, 17, 20, 23, 25, 28, 30, 33, 35,
-                        38, 40, 43, 45, 48, 50, 55, 60, 65, 70, 75, 80, 90,
-                        100, 110, 120, 130, 140, 150, 175, 200, 250]
+            num_epochs = [3, 5, 7, 10, 13, 15, 17, 20, 23, 25, 28, 30, 35,
+                         40, 45, 50, 60, 70, 80, 90,
+                        100, 150, 200]
         if negatives is None:
             negatives = [5, 10]
         if samples is None:
@@ -499,10 +499,10 @@ class ExperimentRunner:
             "vector": ("vector_size", vector_sizes),
             "windowsize": ("window", window_sizes),
             "epoch": ("epochs", num_epochs),
-            "negative": ("negative", negatives),
-            "sample": ("sample", samples),
-            "hs": ("hs", hs_values),
-            "alpha": ("alpha", alphas),
+            #"negative": ("negative", negatives),
+            #"sample": ("sample", samples),
+            #"hs": ("hs", hs_values),
+            #"alpha": ("alpha", alphas),
             #"seed": ("seed", seeds),
         }
         
