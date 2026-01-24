@@ -2,9 +2,10 @@ from unittest import result
 from .Semantic_SQL_Model_Quality_Score_tests import neighborhood_discriminability_test_silhouette, rank_stability_test_average, feature_coherence_test
 from .key_vector_tests import evaluate_model_key_quality
 import pandas as pd
+import re
 import numpy as np
 
-def run_all_tests(info, average_sentence_vectors_list, verbose, df_with_keys, model):
+def run_all_tests(info, average_sentence_vectors_list, verbose, df_with_keys, model, new_col_df):
     full_result = {
         "params": info
     }
@@ -17,10 +18,12 @@ def run_all_tests(info, average_sentence_vectors_list, verbose, df_with_keys, mo
 
     full_result["rs_mean"], full_result["rs_5"], full_result["rs_10"], full_result["rs_20"] = \
         rank_stability_test_average(average_sentence_vectors_list, verbose)
+    
     full_result["fc"] = feature_coherence_test(
-        average_sentence_vectors_list,
-        verbose,
-        df_with_keys=df_with_keys
+        model_list=average_sentence_vectors_list,
+        verbose=verbose,
+        #df_with_keys=df_with_keys,
+        df_with_fc_labels=new_col_df
     )
 
     full_result["kvc"] = evaluate_model_key_quality(
@@ -43,7 +46,7 @@ def get_all_sweep_results(average_sentence_vectors, models, df_with_keys, verbos
     models_seed_1 = models[1]
 
     grouped_vectors = aggregate_vectors_by_category_and_model_info(average_sentence_vectors)
-
+    new_col_df = derive_fc_labels(df_with_keys)
     for category, model_info in grouped_vectors.items():
         print(f"(-------------Test of category: {category.upper()}-------------)\n")
         for average_sentence_vectors_list, model in zip(model_info, models_seed_1[category]):
@@ -57,7 +60,8 @@ def get_all_sweep_results(average_sentence_vectors, models, df_with_keys, verbos
                 average_sentence_vectors_list = average_sentence_vectors_list, 
                 model = model,  
                 verbose=verbose, 
-                df_with_keys=df_with_keys
+                df_with_keys=df_with_keys,
+                new_col_df=new_col_df
             )
             
             # Füge Test_Category zu params hinzu
@@ -193,7 +197,7 @@ def prepare_model_info(model_info):
 def get_all_grid_results(average_sentence_vectors, models, df_with_keys, verbose=False):
     all_model_results = []
     models_seed_1 = models[1]
-
+    new_col_df = derive_fc_labels(df_with_keys)
     grouped_vectors = aggregate_vectors_by_model_info(average_sentence_vectors)
 
     for average_sentence_vectors_list, model in zip(grouped_vectors, models_seed_1):
@@ -207,7 +211,8 @@ def get_all_grid_results(average_sentence_vectors, models, df_with_keys, verbose
             average_sentence_vectors_list = average_sentence_vectors_list, 
             model = model,  
             verbose=verbose, 
-            df_with_keys=df_with_keys
+            df_with_keys=df_with_keys,
+            new_col_df=new_col_df
         )
         
         # KEINE Test_Category - das ist der einzige Unterschied
@@ -321,3 +326,142 @@ def aggregate_vectors_by_model_info(average_sentence_vectors):
                 (seed, vectors)
             )
     return list(aggregation.values())
+
+
+
+
+#---------------------------------------------------------
+# Hilfsfunktionen
+#---------------------------------------------------------
+
+KEY_COL_PREFIX = "key"
+
+def _extract_suffix(token: str, prefix: str) -> str:
+    """
+    Extract suffix from tokens like 'Credit_Score_Fair' -> 'Fair'
+    If token does not match, return token unchanged.
+    """
+    if not isinstance(token, str):
+        return str(token)
+    if token.startswith(prefix):
+        return token[len(prefix):]
+    return token
+
+def derive_fc_labels(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds derived FC label columns to df:
+      - fc_risk_tier
+      - fc_value_tier
+      - fc_engagement_tier
+      - fc_segment (combined)
+    These columns MUST NOT be included in textification/training corpus.
+    """
+    out = df.copy()
+
+    # --- Risk tier from credit_score categories ---
+    # credit_score tokens: Credit_Score_Poor, Credit_Score_Fair, Credit_Score_Good, Credit_Score_Very_Good, Credit_Score_Excellent
+    score = out["credit_score"].astype(str)
+
+    def risk_map(x: str) -> str:
+        if "Poor" in x or "Fair" in x:
+            return "FCRISK_High"
+        if "Good" in x and "Very_Good" not in x:
+            return "FCRISK_Medium"
+        if "Very_Good" in x or "Excellent" in x:
+            return "FCRISK_Low"
+        return "FCRISK_Unknown"
+
+    out["fc_risk_tier"] = score.map(risk_map)
+
+    # --- Value tier from balance cluster + salary category ---
+    # balance: Balance_Cluster_1 ... _10 (higher cluster -> higher value, assuming your clustering is ordered)
+    # salary: Salary_Very_low ... Salary_Very_high
+    balance = out["balance"].astype(str)
+    salary = out["estimated_salary"].astype(str)
+
+    def balance_level(x: str) -> int:
+        m = re.search(r"Balance_Cluster_(\d+)", x)
+        return int(m.group(1)) if m else -1
+
+    def salary_level(x: str) -> int:
+        # Ordered rough scale
+        order = {
+            "Very_low": 1, "Low": 2, "Below_average": 3, "Average": 4,
+            "Above_average": 5, "High": 6, "Very_high": 7
+        }
+        for k, v in order.items():
+            if k in x:
+                return v
+        return -1
+
+    bal_lvl = balance.map(balance_level)
+    sal_lvl = salary.map(salary_level)
+
+    # Simple rule: high value if balance high OR salary high
+    # Adjust thresholds to your needs; these are reasonable defaults.
+    out["fc_value_tier"] = pd.Series([
+        "FCVAL_High" if (b >= 7 or s >= 6) else
+        "FCVAL_Medium" if (b >= 4 or s >= 4) else
+        "FCVAL_Low"
+        for b, s in zip(bal_lvl, sal_lvl)
+    ], index=out.index)
+
+    # --- Engagement tier from tenure + active_member + products_number ---
+    tenure = out["tenure"].astype(str)
+    active = out["active_member"].astype(str)
+    products = out["products_number"].astype(str)
+
+    def tenure_int(x: str) -> int:
+        m = re.search(r"Tenure_(\d+)", x)
+        return int(m.group(1)) if m else -1
+
+    def products_int(x: str) -> int:
+        m = re.search(r"ProductsNumber_(\d+)", x)
+        return int(m.group(1)) if m else -1
+
+    ten = tenure.map(tenure_int)
+    prod = products.map(products_int)
+    is_active = active.str.contains("Yes", regex=False)
+
+    out["fc_engagement_tier"] = pd.Series([
+        "FCENG_High" if (ia and (t >= 5 or p >= 2)) else
+        "FCENG_Medium" if (ia or t >= 3 or p >= 2) else
+        "FCENG_Low"
+        for ia, t, p in zip(is_active, ten, prod)
+    ], index=out.index)
+
+    # --- Combined segment label (compact, categorical, easy for Jaccard) ---
+    out["fc_segment"] = (
+        out["fc_risk_tier"] + "|" +
+        out["fc_value_tier"] + "|" +
+        out["fc_engagement_tier"]
+    ).astype("category")
+
+    return out
+
+
+def build_training_sentences(df: pd.DataFrame, exclude_cols=None) -> list[list[str]]:
+    """
+    Builds Word2Vec sentences from a tokenized dataframe.
+    Excludes key columns and any explicit exclude_cols (e.g. FC label columns).
+    """
+    if exclude_cols is None:
+        exclude_cols = []
+
+    cols = []
+    for c in df.columns:
+        if c in exclude_cols:
+            continue
+        if c.lower().startswith(KEY_COL_PREFIX):
+            continue
+        cols.append(c)
+
+    # Each row -> list of tokens
+    sentences = df[cols].astype(str).values.tolist()
+    return sentences
+
+
+# --- Usage ---
+# df_fc = derive_fc_labels(df)  # df is your token dataframe
+# sentences = build_training_sentences(df_fc, exclude_cols=["fc_risk_tier", "fc_value_tier", "fc_engagement_tier", "fc_segment"])
+# FC should then use df_fc[["fc_risk_tier", "fc_value_tier", "fc_engagement_tier", "fc_segment"]] as metadata, not tokens.

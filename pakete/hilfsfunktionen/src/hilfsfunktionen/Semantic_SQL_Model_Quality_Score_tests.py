@@ -1,6 +1,6 @@
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, silhouette_samples
 import numpy as np
 
 def get_key_values(key, filter, prefix="key", df_with_keys=None):
@@ -60,7 +60,7 @@ def neighborhood_discriminability_test_silhouette(model, verbose=False):
     Prüft, wie gut die Vektoren innerhalb ihrer semantischen Klassen 
     gruppiert sind im Vergleich zu anderen Klassen.
     """
-    # ACHTUNG: Ihr Code verwendet model[0] - ist model eine Liste/Tupel?
+
     # Wenn model das Word2Vec-Modell direkt ist, verwenden Sie es direkt:
     if isinstance(model, (list, tuple)):
         wv_model = model[0]  # Wenn model eine Liste/Tupel ist
@@ -94,27 +94,23 @@ def neighborhood_discriminability_test_silhouette(model, verbose=False):
         return 0.0
     
     # 2. Silhouette Score berechnen
+    # 2. Silhouette pro Sample berechnen und dann pro Sample kappen (wie in der Formel)
     try:
-        # Verwende 'cosine' als Distanzmaß
-        score = silhouette_score(vectors, numeric_labels, metric='cosine')
-        
+        s = silhouette_samples(vectors, numeric_labels, metric='cosine')  # Werte in [-1, 1]
+        nd = float(np.maximum(0.0, s).mean())  # Mittelwert über max(0, s(r))
+
         if verbose:
-            print(f"Neighborhood Discriminability (Silhouette): {score:.4f}")
+            print(f"Neighborhood Discriminability (Silhouette, per-sample clipped): {nd:.4f}")
             print(f"Anzahl Samples: {len(vectors)}")
             print(f"Anzahl Klassen: {len(np.unique(numeric_labels))}")
             print(f"Klassen: {label_encoder.classes_}")
-            
-            # Zusätzliche Diagnose-Informationen
+
             unique, counts = np.unique(numeric_labels, return_counts=True)
             class_counts = {label_encoder.inverse_transform([u])[0]: int(c) for u, c in zip(unique, counts)}
             print(f"Klassenverteilung: {class_counts}")
 
-        
-        # Silhouette Score liegt zwischen -1 und 1
-        # Negative Scores sind schlecht, also normalisieren wir auf [0, 1]
-        nd_norm = max(0, score)
-        
-        return float(nd_norm)
+        return nd
+
         
     except Exception as e:
         if verbose:
@@ -309,69 +305,74 @@ def top_k_neighbors_rs(anchor_idx, vectors, k):
 def jaccard_index(a, b):
     return len(a & b) / len(a | b)
 
+#---------------------------------------------------------------
+# Hilfsfunktionen für Feature Coherence Test
+#---------------------------------------------------------------
+
+def get_fc_feature_set_from_df(df_with_fc_labels, index, fc_cols):
+    """
+    Liefert ein Set diskreter Feature-Tokens aus den neuen FC-Label-Spalten.
+    Beispiel: {'FCRISK_High', 'FCVAL_Medium', 'FCENG_Low'}
+    """
+    vals = df_with_fc_labels.iloc[index][fc_cols].astype(str).tolist()
+    return set(v for v in vals if v and v.lower() != "nan")
 
 
-def get_vectors_and_rows_for_seed(model_list, df_with_keys, seed_target):
+def get_vectors_and_rows_for_seed(model_list, df_with_fc_labels, seed_target, fc_cols):
     sentence_vectors, rows = [], []
     for seed, vectors in model_list["data"]:
         if seed == seed_target:
             for index, vector in zip(vectors["index"], vectors["vector"]):
-                # Prüfen, ob Zeile index wirklich key_{index+1} enthält
-                row = df_with_keys.iloc[index].astype(str).tolist()
+                row = df_with_fc_labels.iloc[index].astype(str).tolist()
                 assert any(v == f"key_{index+1}" for v in row), f"Mismatch at index={index}"
-                sentence_vectors.append(vector)
-                fc_cols = ["credit_card", "gender", "balance", "credit_score", "churn"]
 
-                rows.append(get_key_values_by_column(index, True, prefix="key", df_with_keys=df_with_keys, include_cols=fc_cols))
+                sentence_vectors.append(vector)
+
+                rows.append(get_fc_feature_set_from_df(df_with_fc_labels, index, fc_cols))
 
     return np.array(sentence_vectors), rows
 
 def feature_coherence_test(
     model_list,
+    df_with_fc_labels,
     verbose=False,
     k=10,
     df_with_keys=None,
     normalize=True,
     clip_normalized=False,
     rng_seed=42,
-    return_details=False
+    return_details=False,
+    fc_cols=None,
 ):
-    """
-    Raw FC:
-      FC_global = mean_seed mean_r mean_{n in N_k(r)} Jaccard(F(r), F(n))
-
-    Random Baseline:
-      FC_random = mean_seed mean_r mean_{n in Random_k(r)} Jaccard(F(r), F(n))
-
-    Normalized (Lift):
-      FC_norm = (FC_knn - FC_random) / (1 - FC_random)
-
-    Notes:
-    - Raw FC und FC_random liegen in [0,1].
-    - FC_norm kann negativ sein (schlechter als Zufall). Mit clip_normalized=True wird auf [0,1] gekappt.
-    - Voraussetzung: vectors["index"] muss 0-basierte Positionsindizes in df_with_keys sein (passt zu df_with_keys.iloc[key]).
-    """
+    if fc_cols is None:
+        fc_cols = ["fc_risk_tier", "fc_value_tier", "fc_engagement_tier"]
 
     seed_fc_scores = []
     seed_rand_scores = []
-    #verbose=True
+
+    #verbose = True
 
     for seed, _ in model_list["data"]:
-        vectors, rows = get_vectors_and_rows_for_seed(model_list, df_with_keys, seed)
+        vectors, rows = get_vectors_and_rows_for_seed(
+            model_list=model_list,
+            df_with_fc_labels=df_with_fc_labels,
+            seed_target=seed,
+            fc_cols=fc_cols
+        )
         n = len(vectors)
 
-        # Für random neighbors ohne replacement braucht man mindestens k+1 Instanzen
+        if verbose:
+            print("rows sample:", rows[0] if rows else "No rows")
+
         if n < k + 1:
             continue
 
-        # Similarity-Matrix für KNN
         sim_matrix = cosine_similarity(vectors)
         np.fill_diagonal(sim_matrix, -1)
 
-        # Feature-Matrix (binarisiert)
+        # Feature-Matrix (binarisiert) basiert jetzt auf FC-Label-Sets
         feature_matrix = MultiLabelBinarizer().fit_transform(rows)
 
-        # Reproduzierbarer RNG pro Seed
         rng = np.random.default_rng(int(rng_seed) + int(seed))
 
         all_indices = np.arange(n)
@@ -379,11 +380,9 @@ def feature_coherence_test(
         rand_per_instance = []
 
         for i in range(n):
-            # --- KNN neighbors ---
             neighbors = np.argsort(sim_matrix[i])[::-1][:k]
             fc_per_instance.append(compute_feature_overlap_fast(i, neighbors, feature_matrix))
 
-            # --- Random baseline neighbors ---
             candidates = all_indices[all_indices != i]
             rand_neighbors = rng.choice(candidates, size=k, replace=False)
             rand_per_instance.append(compute_feature_overlap_fast(i, rand_neighbors, feature_matrix))
@@ -401,11 +400,7 @@ def feature_coherence_test(
         return (fc_knn, fc_random) if return_details else fc_knn
 
     denom = 1.0 - fc_random
-    if denom <= 0:
-        # Extremfall: Baseline == 1.0, dann ist Normalisierung nicht sinnvoll.
-        fc_norm = 0.0
-    else:
-        fc_norm = (fc_knn - fc_random) / denom
+    fc_norm = 0.0 if denom <= 0 else (fc_knn - fc_random) / denom
 
     if clip_normalized:
         fc_norm = float(np.clip(fc_norm, 0.0, 1.0))
@@ -416,6 +411,7 @@ def feature_coherence_test(
         print(f"Feature Coherence normalized: {fc_norm:.4f}")
 
     return (float(fc_norm), fc_knn, fc_random) if return_details else float(fc_norm)
+
 
 
 
