@@ -15,7 +15,7 @@ services:
       - POSTGRES_USER=semantic_user
       - POSTGRES_PASSWORD=semantic_pass
     volumes:
-      - ./data:/data
+      - ./data_persistent:/workspace 
       - .:/app
       - ./pakete/hilfsfunktionen:/app/pakete/hilfsfunktionen
     command: >
