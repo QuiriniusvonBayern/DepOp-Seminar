@@ -97,8 +97,13 @@ def compute_phase1_similarity_df(
       - S_topN_<N> für N in topn_values
       - S_k_<k>    für k in k_values
 
-    Output (langes Format):
-    Referenzkunde_ID, Kunde_ID, S_max, S_centroid, S_avg, S_topN_*, S_k_*
+    Output (langes Format, vorlesungskonform benannt):
+    Referenzkunde_ID, Kunde_ID,
+      - S_max    : ProximityMax
+      - S_avg    : ProximityAvg (Cosine zwischen Zentroiden)
+      - S_avgall : ProximityAvgAll (Mittelwert über alle Paarungen)
+      - S_topN_<N> : ProximityTopNAvg (Top-N über zeilenweise Maxima)
+      - S_k_<k>  : SubsetProximityAvg(k, ...)
     """
     if df_with_keys is None or len(df_with_keys) == 0:
         raise ValueError("df_with_keys ist leer oder None.")
@@ -115,7 +120,6 @@ def compute_phase1_similarity_df(
     total_refs = len(reference_ids)
     total_customers = len(df_with_keys)
 
-    # Optional: deterministische Reihenfolge + Validierung
     topn_values = tuple(int(n) for n in topn_values)
     k_values = tuple(int(k) for k in k_values)
 
@@ -131,19 +135,21 @@ def compute_phase1_similarity_df(
 
             v_other = all_vectors[other_id]
 
+            # Vorlesungsnamen strikt einhalten:
+            #   ProximityMax    -> S_max
+            #   ProximityAvg    -> S_avg
+            #   ProximityAvgAll -> S_avgall
             row = {
                 "Referenzkunde_ID": ref_id,
                 "Kunde_ID": other_id,
                 "S_max": proximity_max(v_ref, v_other),
-                "S_centroid": proximity_avg(v_ref, v_other),
-                "S_avg": proximity_avg_all(v_ref, v_other),
+                "S_avg": proximity_avg(v_ref, v_other),
+                "S_avgall": proximity_avg_all(v_ref, v_other),
             }
 
-            # S_topN für mehrere N
             for n in topn_values:
                 row[f"S_topN_{n}"] = proximity_topn_avg(v_ref, v_other, n=n)
 
-            # S_k für mehrere k (subset_size)
             for k in k_values:
                 try:
                     row[f"S_k_{k}"] = subset_proximity_avg(v_ref, v_other, subset_size=k)
@@ -152,13 +158,13 @@ def compute_phase1_similarity_df(
 
             rows.append(row)
 
-    # Spaltenreihenfolge sauber setzen
-    base_cols = ["Referenzkunde_ID", "Kunde_ID", "S_max", "S_centroid", "S_avg"]
+    base_cols = ["Referenzkunde_ID", "Kunde_ID", "S_max", "S_avg", "S_avgall"]
     topn_cols = [f"S_topN_{n}" for n in topn_values]
     k_cols = [f"S_k_{k}" for k in k_values]
     cols = base_cols + topn_cols + k_cols
 
     return pd.DataFrame(rows)[cols]
+
 
 
 

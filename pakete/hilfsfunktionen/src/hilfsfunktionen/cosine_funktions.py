@@ -1,348 +1,210 @@
 import numpy as np
 from itertools import combinations
-from typing import List, Tuple, Iterable
+from typing import List
 
-# -------------------------
-# Grundfunktion
-# -------------------------
-def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
-    v1 = np.asarray(v1, dtype=float).ravel()
-    v2 = np.asarray(v2, dtype=float).ravel()
-    if v1.shape != v2.shape:
-        raise ValueError(f"Dimensionen stimmen nicht überein: {v1.shape} vs {v2.shape}")
-    n1 = np.linalg.norm(v1)
-    n2 = np.linalg.norm(v2)
-    if n1 == 0 or n2 == 0:
+
+# ============================================================
+# Core cosine similarity (lecture notation: S_c)
+# ============================================================
+
+def cosine_similarity(x: np.ndarray, y: np.ndarray) -> float:
+    """
+    Cosine similarity S_c(x,y) as used throughout the lecture.
+    """
+    denom = np.linalg.norm(x) * np.linalg.norm(y)
+    if denom == 0:
         return 0.0
-    return float(np.dot(v1, v2) / (n1 * n2))
+    return float(np.dot(x, y) / denom)
 
 
-# -------------------------
-# Hilf: bereite Matrixformen vor
-# -------------------------
-def _as_matrix(vecs: Iterable[np.ndarray]) -> np.ndarray:
-    vecs = list(vecs)
-    if not vecs:
-        return np.zeros((0, 0), dtype=float)
-    mat = np.vstack([np.asarray(v, dtype=float).ravel() for v in vecs])
-    return mat  # shape: (m, d)
+def _cosine_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """
+    Compute pairwise cosine similarity matrix between two sets of vectors.
+    A: shape (n_A, d)
+    B: shape (n_B, d)
+    """
+    A_norm = np.linalg.norm(A, axis=1, keepdims=True)
+    B_norm = np.linalg.norm(B, axis=1, keepdims=True)
+
+    # avoid division by zero
+    A_norm[A_norm == 0] = 1.0
+    B_norm[B_norm == 0] = 1.0
+
+    return (A @ B.T) / (A_norm @ B_norm.T)
 
 
-# -------------------------
-# 1) ProximityMax
-# -------------------------
-def proximity_max(set1: List[np.ndarray], set2: List[np.ndarray]) -> float:
-    A = _as_matrix(set1)  # shape (m, d)
-    B = _as_matrix(set2)  # shape (n, d)
-    if A.size == 0 or B.size == 0:
-        return 0.0
-    # Dot products
-    D = A @ B.T  # shape (m, n)
-    normsA = np.linalg.norm(A, axis=1)
-    normsB = np.linalg.norm(B, axis=1)
-    denom = np.outer(normsA, normsB)  # shape (m, n)
-    # Avoid division by zero
-    with np.errstate(divide='ignore', invalid='ignore'):
-        S = np.divide(D, denom, out=np.zeros_like(D), where=denom != 0)
+# ============================================================
+# Proximity operators (lecture-consistent)
+# ============================================================
+
+def proximity_max(set1: np.ndarray, set2: np.ndarray) -> float:
+    """
+    ProximityMax(S1,S2) = max_{i,j} S_c(v_i, v_j)
+    """
+    S = _cosine_matrix(set1, set2)
     return float(np.max(S))
 
 
-# -------------------------
-# 2) ProximityAvg (Durchschnittsvektoren)
-# -------------------------
-def proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray]) -> float:
-    if not set1 or not set2:
-        return 0.0
-    A = _as_matrix(set1)
-    B = _as_matrix(set2)
-    avgA = np.mean(A, axis=0)
-    avgB = np.mean(B, axis=0)
-    return cosine_similarity(avgA, avgB)
+def proximity_avg(set1: np.ndarray, set2: np.ndarray) -> float:
+    """
+    ProximityAvg(S1,S2) = S_c(centroid(S1), centroid(S2))
+    """
+    c1 = np.mean(set1, axis=0)
+    c2 = np.mean(set2, axis=0)
+    return cosine_similarity(c1, c2)
 
 
-# -------------------------
-# 3) ProximityTopNAvg (gemäß Tabelle: pro Element max und dann Top-N)
-# -------------------------
-def proximity_topn_avg(set1: List[np.ndarray], set2: List[np.ndarray], n: int = 3) -> float:
-    A = _as_matrix(set1)
-    B = _as_matrix(set2)
-    if A.size == 0 or B.size == 0:
-        return 0.0
-    D = A @ B.T
-    normsA = np.linalg.norm(A, axis=1, keepdims=True)  # (m,1)
-    normsB = np.linalg.norm(B, axis=1, keepdims=True)  # (n,1)
-    denom = normsA @ normsB.T  # (m,n)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        S = np.divide(D, denom, out=np.zeros_like(D), where=denom != 0)
-    # Für jede Zeile (jedes v in set1) das Maximum über Spalten (set2)
-    row_max = np.max(S, axis=1)  # shape (m,)
-    if row_max.size == 0:
-        return 0.0
-    row_max_sorted = np.sort(row_max)[::-1]
-    top = row_max_sorted[:min(n, row_max_sorted.size)]
-    return float(np.mean(top))
-
-
-# -------------------------
-# 4) ProximityAvgAll (Durchschnitt aller Paare)
-# -------------------------
-def proximity_avg_all(set1: List[np.ndarray], set2: List[np.ndarray]) -> float:
-    A = _as_matrix(set1)
-    B = _as_matrix(set2)
-    if A.size == 0 or B.size == 0:
-        return 0.0
-    D = A @ B.T
-    normsA = np.linalg.norm(A, axis=1, keepdims=True)
-    normsB = np.linalg.norm(B, axis=1, keepdims=True)
-    denom = normsA @ normsB.T
-    with np.errstate(divide='ignore', invalid='ignore'):
-        S = np.divide(D, denom, out=np.zeros_like(D), where=denom != 0)
+def proximity_avg_all(set1: np.ndarray, set2: np.ndarray) -> float:
+    """
+    ProximityAvgAll(S1,S2) = average of all pairwise cosine similarities.
+    """
+    S = _cosine_matrix(set1, set2)
     return float(np.mean(S))
 
-# -------------------------
-# 5) SubsetProximityAvg (gemäß Tabelle: beste Subset-Kombinationen und ProximityMax)
-# -------------------------
-def subset_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], subset_size: int = 3) -> float:
+
+def proximity_topn_avg(set1: np.ndarray, set2: np.ndarray, n: int) -> float:
     """
-    Korrekte Umsetzung gemäß Slides:
-    1) Alle Subsets der Größe subset_size aus set1 bilden, für jedes Subset den Zentroid (Mittelwert) berechnen -> H_S1
-    2) Analog für set2 -> H_S2
-    3) ProximityMax(H_S1, H_S2) berechnen (maximale Kosinus-Ähnlichkeit zwischen allen Zentroid-Paaren)
+    ProximityTopNAvg(S1,S2):
+    For each vector in S1, take its best match in S2,
+    then average the top-N of these maxima.
     """
-    A = _as_matrix(set1)  # (m, d)
-    B = _as_matrix(set2)  # (n, d)
+    if n <= 0:
+        return 0.0
 
-    m = A.shape[0] if A.size else 0
-    n = B.shape[0] if B.size else 0
+    S = _cosine_matrix(set1, set2)
+    row_maxima = np.max(S, axis=1)
+    row_maxima_sorted = np.sort(row_maxima)[::-1]
 
-    if m < subset_size or n < subset_size:
-        raise ValueError(f"Beide Mengen müssen mindestens subset_size={subset_size} Elemente enthalten "
-                         f"(aktuell: {m}, {n}).")
-
-    # --- 1) Alle Subset-Zentroiden für set1 erzeugen ---
-    centroids1 = []
-    for idxs in combinations(range(m), subset_size):
-        sub = A[list(idxs), :]                 # shape: (subset_size, d)
-        centroid = np.mean(sub, axis=0)        # Zentroid des Subsets
-        centroids1.append(centroid)
-    C1 = np.vstack(centroids1)                # shape: (k1, d)
-
-    # --- 2) Alle Subset-Zentroiden für set2 erzeugen ---
-    centroids2 = []
-    for idxs in combinations(range(n), subset_size):
-        sub = B[list(idxs), :]
-        centroid = np.mean(sub, axis=0)
-        centroids2.append(centroid)
-    C2 = np.vstack(centroids2)                # shape: (k2, d)
-
-    # --- 3) ProximityMax über die Zentroidmengen ---
-    return proximity_max(C1, C2)
+    n_eff = min(n, len(row_maxima_sorted))
+    return float(np.mean(row_maxima_sorted[:n_eff]))
 
 
-# Neue Datei: weighted_cosine_functions.py
-
-
-# -------------------------
-# Hilfsfunktion: Gewichteter Zentroid
-# -------------------------
-def weighted_centroid(vecs: List[np.ndarray], weights: np.ndarray) -> np.ndarray:
+def subset_proximity_avg(set1: np.ndarray, set2: np.ndarray, k: int) -> float:
     """
-    Berechnet gewichteten Mittelwert einer Liste von Vektoren.
-    
-    Parameters:
-    -----------
-    vecs : List[np.ndarray]
-        Liste von Feature-Vektoren
-    weights : np.ndarray
-        Gewichtungsvektor (gleiche Länge wie vecs)
-    
-    Returns:
-    --------
-    np.ndarray : Gewichteter Zentroid
+    SubsetProximityAvg(k,S1,S2):
+    Build centroids of all k-sized subsets and apply ProximityMax.
+    WARNING: combinatorial explosion for large sets.
     """
-    if not vecs:
-        raise ValueError("vecs darf nicht leer sein")
-    
-    mat = _as_matrix(vecs)  # shape: (n_features, dim)
-    weights = np.asarray(weights, dtype=float).ravel()
-    
-    if len(weights) != mat.shape[0]:
-        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Vektoren ({mat.shape[0]})")
-    
-    # Gewichtete Summe
-    weighted_sum = np.zeros(mat.shape[1])
+    if k <= 0:
+        return 0.0
+
+    subsets_1 = [
+        np.mean(np.stack(c), axis=0)
+        for c in combinations(set1, k)
+    ]
+    subsets_2 = [
+        np.mean(np.stack(c), axis=0)
+        for c in combinations(set2, k)
+    ]
+
+    A = np.stack(subsets_1)
+    B = np.stack(subsets_2)
+
+    return proximity_max(A, B)
+
+
+# ============================================================
+# Weighted cosine similarity (lecture-consistent)
+# ============================================================
+
+def weighted_cosine_similarity_rows(
+    row_a: List[np.ndarray],
+    row_b: List[np.ndarray],
+    weights: np.ndarray
+) -> float:
+    """
+    Lecture-consistent weighted cosine similarity:
+
+    S_{c,w}(row_a, row_b)
+      = sum_i w_i * S_c(row_{a,i}, row_{b,i}) / sum_i w_i
+
+    - weights correspond to FEATURES (not embedding dimensions)
+    - w_i >= 0
+    """
+    if len(row_a) != len(row_b):
+        raise ValueError("row_a and row_b must have the same number of features")
+
+    if len(row_a) != len(weights):
+        raise ValueError("Weight vector length must equal number of features")
+
+    weights = np.asarray(weights, dtype=float)
+
+    if np.any(weights < 0):
+        raise ValueError("Weights must be non-negative")
+
+    weight_sum = np.sum(weights)
+    if weight_sum == 0:
+        return 0.0
+
+    sim = 0.0
     for i, w in enumerate(weights):
-        weighted_sum += mat[i] * w
-    
-    # Normalisierung durch Summe der Gewichte
-    weight_sum = np.sum(weights)
-    if weight_sum == 0:
-        raise ValueError("Summe der Gewichte ist 0")
-    
-    return weighted_sum / weight_sum
+        if w == 0:
+            continue
+        sim += w * cosine_similarity(row_a[i], row_b[i])
+
+    return float(sim / weight_sum)
 
 
-# -------------------------
-# Gewichtete Ähnlichkeitsfunktionen
-# -------------------------
-
-def weighted_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
-                          weights: np.ndarray) -> float:
+def weighted_proximity_avg(
+    row_a: List[np.ndarray],
+    row_b: List[np.ndarray],
+    weights: np.ndarray
+) -> float:
     """
-    S_centroid mit Gewichtung: Kosinus-Ähnlichkeit der gewichteten Zentroiden.
-    
-    Formel aus Vorlesung:
-    sim_w(R, C) = cos(centroid_w(R), centroid_w(C))
+    Alias for the lecture-weighted row similarity.
+    Kept for naming consistency with other modules.
     """
-    if not set1 or not set2:
-        return 0.0
-    
-    centroid1 = weighted_centroid(set1, weights)
-    centroid2 = weighted_centroid(set2, weights)
-    
-    return cosine_similarity(centroid1, centroid2)
+    return weighted_cosine_similarity_rows(row_a, row_b, weights)
 
 
-def weighted_proximity_topn_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
-                                weights: np.ndarray, n: int = 3) -> float:
+# ============================================================
+# Extensions (NOT part of the lecture core)
+# ============================================================
+
+def weighted_proximity_max(row_a, row_b, weights):
     """
-    S_topN mit Gewichtung: Paarweise gewichtete Kosinus-Ähnlichkeiten, dann Top-N Durchschnitt.
-    
-    Ansatz: Berechne für jedes Feature-Paar die Ähnlichkeit, gewichte sie, dann Top-N.
+    Extension: max over weighted feature-wise cosine similarities.
+    NOT a lecture operator.
     """
-    mat1 = _as_matrix(set1)  # (m, dim)
-    mat2 = _as_matrix(set2)  # (n, dim)
-    weights = np.asarray(weights, dtype=float).ravel()
-    
-    if mat1.size == 0 or mat2.size == 0:
-        return 0.0
-    
-    if len(weights) != mat1.shape[0]:
-        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
-    
-    # Paarweise Kosinus-Ähnlichkeiten für jedes Feature
-    feature_sims = []
-    for i in range(mat1.shape[0]):
-        sim = cosine_similarity(mat1[i], mat2[i])
-        feature_sims.append(sim)
-    
-    feature_sims = np.array(feature_sims)
-    
-    # Gewichtete Ähnlichkeiten
-    weighted_sims = feature_sims * weights
-    
-    # Top-N auswählen (höchste gewichtete Ähnlichkeiten)
-    sorted_sims = np.sort(weighted_sims)[::-1]
-    top_n_sims = sorted_sims[:min(n, len(sorted_sims))]
-    
-    # Normalisierung durch Summe der entsprechenden Gewichte
-    sorted_indices = np.argsort(weighted_sims)[::-1][:min(n, len(weighted_sims))]
-    weight_sum = np.sum(weights[sorted_indices])
-    
-    if weight_sum == 0:
-        return 0.0
-    
-    return float(np.sum(top_n_sims) / weight_sum)
+    sims = [
+        weights[i] * cosine_similarity(row_a[i], row_b[i])
+        for i in range(len(weights))
+        if weights[i] > 0
+    ]
+    return max(sims) if sims else 0.0
 
 
-def weighted_proximity_avg_all(set1: List[np.ndarray], set2: List[np.ndarray], 
-                               weights: np.ndarray) -> float:
+def weighted_proximity_topn_avg(row_a, row_b, weights, n):
     """
-    S_avg mit Gewichtung: Durchschnitt aller paarweisen gewichteten Ähnlichkeiten.
+    Extension: top-N over feature-wise cosine similarities.
+    NOT a lecture operator.
     """
-    mat1 = _as_matrix(set1)
-    mat2 = _as_matrix(set2)
-    weights = np.asarray(weights, dtype=float).ravel()
-    
-    if mat1.size == 0 or mat2.size == 0:
-        return 0.0
-    
-    if len(weights) != mat1.shape[0]:
-        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
-    
-    # Paarweise Ähnlichkeiten für jedes Feature
-    feature_sims = []
-    for i in range(mat1.shape[0]):
-        sim = cosine_similarity(mat1[i], mat2[i])
-        feature_sims.append(sim)
-    
-    feature_sims = np.array(feature_sims)
-    
-    # Gewichteter Durchschnitt
-    weighted_sum = np.sum(feature_sims * weights)
-    weight_sum = np.sum(weights)
-    
-    if weight_sum == 0:
-        return 0.0
-    
-    return float(weighted_sum / weight_sum)
+    sims = [
+        cosine_similarity(row_a[i], row_b[i])
+        for i in range(len(weights))
+        if weights[i] > 0
+    ]
+    sims = sorted(sims, reverse=True)
+    n_eff = min(n, len(sims))
+    return float(np.mean(sims[:n_eff])) if n_eff > 0 else 0.0
 
 
-def weighted_proximity_max(set1: List[np.ndarray], set2: List[np.ndarray], 
-                          weights: np.ndarray) -> float:
+def weighted_proximity_avg_all(row_a, row_b, weights):
     """
-    S_max mit Gewichtung: Maximum der paarweisen gewichteten Ähnlichkeiten.
+    Extension: identical to lecture-weighted similarity for aligned features.
     """
-    mat1 = _as_matrix(set1)
-    mat2 = _as_matrix(set2)
-    weights = np.asarray(weights, dtype=float).ravel()
-    
-    if mat1.size == 0 or mat2.size == 0:
-        return 0.0
-    
-    if len(weights) != mat1.shape[0]:
-        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
-    
-    # Paarweise Ähnlichkeiten für jedes Feature
-    feature_sims = []
-    for i in range(mat1.shape[0]):
-        sim = cosine_similarity(mat1[i], mat2[i])
-        feature_sims.append(sim)
-    
-    feature_sims = np.array(feature_sims)
-    
-    # Gewichtete Ähnlichkeiten
-    weighted_sims = feature_sims * weights
-    
-    return float(np.max(weighted_sims))
+    return weighted_cosine_similarity_rows(row_a, row_b, weights)
 
 
-def weighted_subset_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
-                                  weights: np.ndarray, subset_size: int = 3) -> float:
+# ============================================================
+# Legacy helper (not lecture-consistent, kept for compatibility)
+# ============================================================
+
+def weighted_centroid(vectors: np.ndarray, weights: np.ndarray) -> np.ndarray:
     """
-    S_k mit Gewichtung: Gewichtete Zentroiden von Subsets, dann ProximityMax.
+    Compute a weighted centroid (NOT lecture core).
     """
-    from itertools import combinations
-    
-    mat1 = _as_matrix(set1)
-    mat2 = _as_matrix(set2)
-    weights = np.asarray(weights, dtype=float).ravel()
-    
-    m = mat1.shape[0] if mat1.size else 0
-    n = mat2.shape[0] if mat2.size else 0
-    
-    if m < subset_size or n < subset_size:
-        raise ValueError(f"Beide Mengen müssen mindestens subset_size={subset_size} Elemente enthalten "
-                        f"(aktuell: {m}, {n}).")
-    
-    if len(weights) != m:
-        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({m})")
-    
-    # Alle Subset-Zentroiden für set1
-    centroids1 = []
-    for idxs in combinations(range(m), subset_size):
-        sub_vecs = [mat1[i] for i in idxs]
-        sub_weights = weights[list(idxs)]
-        centroid = weighted_centroid(sub_vecs, sub_weights)
-        centroids1.append(centroid)
-    
-    # Alle Subset-Zentroiden für set2
-    centroids2 = []
-    for idxs in combinations(range(n), subset_size):
-        sub_vecs = [mat2[i] for i in idxs]
-        sub_weights = weights[list(idxs)]
-        centroid = weighted_centroid(sub_vecs, sub_weights)
-        centroids2.append(centroid)
-    
-    # ProximityMax über die Zentroiden (ungewichtet, da schon gewichtet)
-    return proximity_max(centroids1, centroids2)
+    weights = np.asarray(weights, dtype=float)
+    if np.sum(weights) == 0:
+        return np.mean(vectors, axis=0)
+    return np.average(vectors, axis=0, weights=weights)
