@@ -137,3 +137,212 @@ def subset_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], subset_
 
     # --- 3) ProximityMax über die Zentroidmengen ---
     return proximity_max(C1, C2)
+
+
+# Neue Datei: weighted_cosine_functions.py
+
+
+# -------------------------
+# Hilfsfunktion: Gewichteter Zentroid
+# -------------------------
+def weighted_centroid(vecs: List[np.ndarray], weights: np.ndarray) -> np.ndarray:
+    """
+    Berechnet gewichteten Mittelwert einer Liste von Vektoren.
+    
+    Parameters:
+    -----------
+    vecs : List[np.ndarray]
+        Liste von Feature-Vektoren
+    weights : np.ndarray
+        Gewichtungsvektor (gleiche Länge wie vecs)
+    
+    Returns:
+    --------
+    np.ndarray : Gewichteter Zentroid
+    """
+    if not vecs:
+        raise ValueError("vecs darf nicht leer sein")
+    
+    mat = _as_matrix(vecs)  # shape: (n_features, dim)
+    weights = np.asarray(weights, dtype=float).ravel()
+    
+    if len(weights) != mat.shape[0]:
+        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Vektoren ({mat.shape[0]})")
+    
+    # Gewichtete Summe
+    weighted_sum = np.zeros(mat.shape[1])
+    for i, w in enumerate(weights):
+        weighted_sum += mat[i] * w
+    
+    # Normalisierung durch Summe der Gewichte
+    weight_sum = np.sum(weights)
+    if weight_sum == 0:
+        raise ValueError("Summe der Gewichte ist 0")
+    
+    return weighted_sum / weight_sum
+
+
+# -------------------------
+# Gewichtete Ähnlichkeitsfunktionen
+# -------------------------
+
+def weighted_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
+                          weights: np.ndarray) -> float:
+    """
+    S_centroid mit Gewichtung: Kosinus-Ähnlichkeit der gewichteten Zentroiden.
+    
+    Formel aus Vorlesung:
+    sim_w(R, C) = cos(centroid_w(R), centroid_w(C))
+    """
+    if not set1 or not set2:
+        return 0.0
+    
+    centroid1 = weighted_centroid(set1, weights)
+    centroid2 = weighted_centroid(set2, weights)
+    
+    return cosine_similarity(centroid1, centroid2)
+
+
+def weighted_proximity_topn_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
+                                weights: np.ndarray, n: int = 3) -> float:
+    """
+    S_topN mit Gewichtung: Paarweise gewichtete Kosinus-Ähnlichkeiten, dann Top-N Durchschnitt.
+    
+    Ansatz: Berechne für jedes Feature-Paar die Ähnlichkeit, gewichte sie, dann Top-N.
+    """
+    mat1 = _as_matrix(set1)  # (m, dim)
+    mat2 = _as_matrix(set2)  # (n, dim)
+    weights = np.asarray(weights, dtype=float).ravel()
+    
+    if mat1.size == 0 or mat2.size == 0:
+        return 0.0
+    
+    if len(weights) != mat1.shape[0]:
+        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
+    
+    # Paarweise Kosinus-Ähnlichkeiten für jedes Feature
+    feature_sims = []
+    for i in range(mat1.shape[0]):
+        sim = cosine_similarity(mat1[i], mat2[i])
+        feature_sims.append(sim)
+    
+    feature_sims = np.array(feature_sims)
+    
+    # Gewichtete Ähnlichkeiten
+    weighted_sims = feature_sims * weights
+    
+    # Top-N auswählen (höchste gewichtete Ähnlichkeiten)
+    sorted_sims = np.sort(weighted_sims)[::-1]
+    top_n_sims = sorted_sims[:min(n, len(sorted_sims))]
+    
+    # Normalisierung durch Summe der entsprechenden Gewichte
+    sorted_indices = np.argsort(weighted_sims)[::-1][:min(n, len(weighted_sims))]
+    weight_sum = np.sum(weights[sorted_indices])
+    
+    if weight_sum == 0:
+        return 0.0
+    
+    return float(np.sum(top_n_sims) / weight_sum)
+
+
+def weighted_proximity_avg_all(set1: List[np.ndarray], set2: List[np.ndarray], 
+                               weights: np.ndarray) -> float:
+    """
+    S_avg mit Gewichtung: Durchschnitt aller paarweisen gewichteten Ähnlichkeiten.
+    """
+    mat1 = _as_matrix(set1)
+    mat2 = _as_matrix(set2)
+    weights = np.asarray(weights, dtype=float).ravel()
+    
+    if mat1.size == 0 or mat2.size == 0:
+        return 0.0
+    
+    if len(weights) != mat1.shape[0]:
+        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
+    
+    # Paarweise Ähnlichkeiten für jedes Feature
+    feature_sims = []
+    for i in range(mat1.shape[0]):
+        sim = cosine_similarity(mat1[i], mat2[i])
+        feature_sims.append(sim)
+    
+    feature_sims = np.array(feature_sims)
+    
+    # Gewichteter Durchschnitt
+    weighted_sum = np.sum(feature_sims * weights)
+    weight_sum = np.sum(weights)
+    
+    if weight_sum == 0:
+        return 0.0
+    
+    return float(weighted_sum / weight_sum)
+
+
+def weighted_proximity_max(set1: List[np.ndarray], set2: List[np.ndarray], 
+                          weights: np.ndarray) -> float:
+    """
+    S_max mit Gewichtung: Maximum der paarweisen gewichteten Ähnlichkeiten.
+    """
+    mat1 = _as_matrix(set1)
+    mat2 = _as_matrix(set2)
+    weights = np.asarray(weights, dtype=float).ravel()
+    
+    if mat1.size == 0 or mat2.size == 0:
+        return 0.0
+    
+    if len(weights) != mat1.shape[0]:
+        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({mat1.shape[0]})")
+    
+    # Paarweise Ähnlichkeiten für jedes Feature
+    feature_sims = []
+    for i in range(mat1.shape[0]):
+        sim = cosine_similarity(mat1[i], mat2[i])
+        feature_sims.append(sim)
+    
+    feature_sims = np.array(feature_sims)
+    
+    # Gewichtete Ähnlichkeiten
+    weighted_sims = feature_sims * weights
+    
+    return float(np.max(weighted_sims))
+
+
+def weighted_subset_proximity_avg(set1: List[np.ndarray], set2: List[np.ndarray], 
+                                  weights: np.ndarray, subset_size: int = 3) -> float:
+    """
+    S_k mit Gewichtung: Gewichtete Zentroiden von Subsets, dann ProximityMax.
+    """
+    from itertools import combinations
+    
+    mat1 = _as_matrix(set1)
+    mat2 = _as_matrix(set2)
+    weights = np.asarray(weights, dtype=float).ravel()
+    
+    m = mat1.shape[0] if mat1.size else 0
+    n = mat2.shape[0] if mat2.size else 0
+    
+    if m < subset_size or n < subset_size:
+        raise ValueError(f"Beide Mengen müssen mindestens subset_size={subset_size} Elemente enthalten "
+                        f"(aktuell: {m}, {n}).")
+    
+    if len(weights) != m:
+        raise ValueError(f"Anzahl Gewichte ({len(weights)}) != Anzahl Features ({m})")
+    
+    # Alle Subset-Zentroiden für set1
+    centroids1 = []
+    for idxs in combinations(range(m), subset_size):
+        sub_vecs = [mat1[i] for i in idxs]
+        sub_weights = weights[list(idxs)]
+        centroid = weighted_centroid(sub_vecs, sub_weights)
+        centroids1.append(centroid)
+    
+    # Alle Subset-Zentroiden für set2
+    centroids2 = []
+    for idxs in combinations(range(n), subset_size):
+        sub_vecs = [mat2[i] for i in idxs]
+        sub_weights = weights[list(idxs)]
+        centroid = weighted_centroid(sub_vecs, sub_weights)
+        centroids2.append(centroid)
+    
+    # ProximityMax über die Zentroiden (ungewichtet, da schon gewichtet)
+    return proximity_max(centroids1, centroids2)

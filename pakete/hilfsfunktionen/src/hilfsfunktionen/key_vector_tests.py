@@ -3,12 +3,17 @@ import numpy as np
 from typing import Dict, List, Tuple, Set
 
 # ------- Deinition of Tests to compare Key-Vectors -----------
-def get_key_values(key, filter, prefix="key", df_with_keys=None):
-    values_with_keys = df_with_keys.iloc[key] #mit Keys
+
+def get_key_values(key, filter, prefix, df_with_keys, with_churn=False):
+    values_with_keys = df_with_keys.iloc[key]
+    if not with_churn:
+        values_with_keys = [str(w) for w in values_with_keys if isinstance(w, str) and not str(w).startswith("Churn_")]
     if filter:
-        return [w for w in values_with_keys if not w.startswith(prefix)]
+        # Nur String-Werte verarbeiten und prüfen
+        return [str(w) for w in values_with_keys if isinstance(w, str) and not str(w).startswith(prefix)]
     else:
-        return [w for w in values_with_keys]
+        # Alle Werte als Strings zurückgeben
+        return [str(w) for w in values_with_keys]
 
 def compare_lists(list1, list2):
     output:str = ""
@@ -54,6 +59,85 @@ def has_churned(customer_index: int, df: pd.DataFrame):
         return False
     
     return "Churn_Yes" == churned_value
+
+def is_female(customer_index: int, df: pd.DataFrame):
+    """
+    Check if a customer has turned based on their row index.
+
+    Prameters:
+    ----------
+    customer_index : int
+        Zero_based index of constomer row in the dataframe.
+    df : pd.DataFrame
+        DataFrame containing cusomer data with 'churn'-column
+        
+    Returns:
+    --------
+    bool
+        True if customer has churned (churn == 'Churn_Yes'), False otherwise
+
+    Raises:
+    -------
+    IndexError
+        if customer_index out of bounds
+    ColumnError
+        If 'churn' column does not exist
+    """
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df-1)}]")
+    if 'gender' not in df.columns:
+        raise IndexError(f"Column 'gender' not in the DataFrame.")
+
+    gender_value = df.iloc[customer_index]['gender']
+
+    if pd.isna(gender_value):
+        return False
+    
+    return "Gender_Female" == gender_value
+
+def in_country(customer_index: int, df: pd.DataFrame):
+    """
+    Check if a customer has turned based on their row index.
+
+    Prameters:
+    ----------
+    customer_index : int
+        Zero_based index of constomer row in the dataframe.
+    df : pd.DataFrame
+        DataFrame containing cusomer data with 'churn'-column
+        
+    Returns:
+    --------
+    bool
+        True if customer has churned (churn == 'Churn_Yes'), False otherwise
+
+    Raises:
+    -------
+    IndexError
+        if customer_index out of bounds
+    ColumnError
+        If 'churn' column does not exist
+    """
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df-1)}]")
+    if 'country' not in df.columns:
+        raise IndexError(f"Column 'country' not in the DataFrame.")
+
+    country_value = df.iloc[customer_index]['country']
+
+    if pd.isna(country_value):
+        return False
+    # countries: Country_France, Country_Germany, Country_Spain
+    # switch for desired country
+    match country_value:
+        case "Country_France":
+            return 0
+        case "Country_Germany":
+            return 1
+        case "Country_Spain":
+            return 2
+
+    return 5
 
 
 # ------- Hilfsfunktionen -----------

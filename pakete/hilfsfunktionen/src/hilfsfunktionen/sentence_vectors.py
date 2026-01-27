@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 import os
-from .cosine_tests import get_vector_list
-from .key_vector_tests import get_key_values, has_churned
+from .benchmark_of_semantic_operatiors import get_vector_list
+from .key_vector_tests import get_key_values, has_churned, is_female, in_country
 from gensim.models import Word2Vec
 
 def calculate_average_sentence_vectors(model: Word2Vec, df_with_keys: pd.DataFrame) -> pd.Series:
@@ -23,6 +23,8 @@ def calculate_average_sentence_vectors(model: Word2Vec, df_with_keys: pd.DataFra
     """
     average_sentence_vectors = {}
     churn_status = {}
+    female_status = {}
+    country_status = {}
     indices = {}
     for i in range(len(df_with_keys)):
         key = f"Key_{i+1}"
@@ -30,12 +32,16 @@ def calculate_average_sentence_vectors(model: Word2Vec, df_with_keys: pd.DataFra
         if len(sentence_vectors) > 0:
             average_sentence_vectors[key] = np.mean(sentence_vectors, axis=0)
             churn_status[key] = has_churned(customer_index=i, df=df_with_keys)
+            female_status[key] = is_female(customer_index=i, df=df_with_keys)
+            country_status[key] = in_country(customer_index=i, df=df_with_keys)
             indices[key] = i
     return pd.DataFrame({
         'index': list(indices.values()), 
         'key': list(average_sentence_vectors.keys()),
         'vector': list(average_sentence_vectors.values()),
-        'churned': list(churn_status.values())
+        'churned': list(churn_status.values()),
+        'female' : list(female_status.values()),
+        'country' : list(country_status.values()),
     })
 
 def create_average_sentence_vectors(model_list, df_with_keys, base_dir, verbose=False):
@@ -68,7 +74,7 @@ def create_average_sentence_vectors(model_list, df_with_keys, base_dir, verbose=
             print(f"Creating average sentence vectors and saving to {name}")
         vectors= calculate_average_sentence_vectors(model, df_with_keys)
         
-        np.savez(name, index=vectors['index'].to_numpy(), key=vectors['key'].to_numpy(), vector=np.array(vectors['vector'].tolist()),  churned=vectors['churned'].to_numpy())
+        np.savez(name, index=vectors['index'].to_numpy(), key=vectors['key'].to_numpy(), vector=np.array(vectors['vector'].tolist()),  churned=vectors['churned'].to_numpy(), female=vectors['female'].to_numpy(), country=vectors['country'].to_numpy())
         return vectors  
     else:
         if verbose:
@@ -78,7 +84,9 @@ def create_average_sentence_vectors(model_list, df_with_keys, base_dir, verbose=
             'index': array_data['index'],
             'key': array_data['key'],
             'vector': list(array_data['vector']),
-            'churned': array_data['churned']
+            'churned': array_data['churned'],
+            'female': array_data['female'],
+            'country': array_data['country']
         })
         df = df.sort_values('index').reset_index(drop=True)
         assert df['index'].is_monotonic_increasing, "Index ist nicht sortiert!"
