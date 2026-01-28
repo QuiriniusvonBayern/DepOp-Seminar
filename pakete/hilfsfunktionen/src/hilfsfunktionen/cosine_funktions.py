@@ -203,7 +203,7 @@ def _subset_proximity_avg_sampling(set1: np.ndarray, set2: np.ndarray,
 # Weighted cosine similarity (lecture-consistent)
 # ============================================================
 
-def weighted_cosine_similarity_rows(
+def weighted_proximity_avg(
     row_a: List[Union[np.ndarray, List]],
     row_b: List[Union[np.ndarray, List]],
     weights: Union[np.ndarray, List]

@@ -10,10 +10,6 @@ import pandas as pd
 # Weighted similarity core + (optional) legacy extensions
 from .cosine_funktions import (
     weighted_proximity_avg,        # lecture-consistent: featurewise weighted cosine
-    weighted_proximity_max,        # extension (not lecture core)
-    weighted_proximity_topn_avg,   # extension (not lecture core)
-    weighted_subset_proximity_avg, # extension (not lecture core) - kept for compatibility
-    weighted_proximity_avg_all     # extension/alias - kept for compatibility
 )
 
 # Heavy reuse from benchmark module (will be revised next step)
@@ -129,11 +125,6 @@ def compute_phase1_weighted_similarity_df(
     # Map metric name -> function
     metric_functions = {
         "proximity_avg": lambda a, b, w: weighted_proximity_avg(a, b, w),  # lecture core
-        # extensions (not lecture core) kept for compatibility:
-        "proximity_topn_avg": lambda a, b, w: weighted_proximity_topn_avg(a, b, w, n=topn_n),
-        "proximity_max": lambda a, b, w: weighted_proximity_max(a, b, w),
-        "proximity_avg_all": lambda a, b, w: weighted_proximity_avg_all(a, b, w),
-        "subset_proximity_avg": lambda a, b, w: weighted_subset_proximity_avg(a, b, w, subset_size=subset_k),
     }
 
     rows = []
@@ -151,6 +142,9 @@ def compute_phase1_weighted_similarity_df(
         for other_id in range(total_customers):
             v_other = all_vectors[other_id]
             if not v_other or len(v_other) != n_features:
+                continue
+
+            if other_id == ref_id: 
                 continue
 
             row = {"Referenzkunde_ID": int(ref_id), "Kunde_ID": int(other_id)}
