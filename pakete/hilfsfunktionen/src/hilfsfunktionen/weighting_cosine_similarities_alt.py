@@ -1,9 +1,5 @@
 from .cosine_funktions import (
-    weighted_proximity_max,
-    weighted_proximity_avg,
-    weighted_proximity_topn_avg,
-    weighted_subset_proximity_avg,
-    weighted_proximity_avg_all
+    weighted_cosine_similarity_rows
 )
 
 from .benchmark_of_semantic_operatiors import (
@@ -80,11 +76,7 @@ def compute_phase1_weighted_similarity_df(
     
     # Mapping von Metrik-Namen zu Funktionen
     metric_functions = {
-        'proximity_avg': weighted_proximity_avg,
-        'proximity_topn_avg': lambda v1, v2, w: weighted_proximity_topn_avg(v1, v2, w, n=topn_n),
-        'proximity_max': weighted_proximity_max,
-        'proximity_avg_all': weighted_proximity_avg_all,
-        'subset_proximity_avg': lambda v1, v2, w: weighted_subset_proximity_avg(v1, v2, w, subset_size=subset_k)
+        'proximity_avg': weighted_cosine_similarity_rows,
     }
     
     for r_idx, ref_id in enumerate(reference_ids, start=1):
