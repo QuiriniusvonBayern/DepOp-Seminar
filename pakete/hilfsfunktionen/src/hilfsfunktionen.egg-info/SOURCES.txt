@@ -15,7 +15,6 @@ src/hilfsfunktionen/model_training.py
 src/hilfsfunktionen/sentence_vectors.py
 src/hilfsfunktionen/visualise_vectors.py
 src/hilfsfunktionen/weighting_cosine_similarities.py
-src/hilfsfunktionen/weighting_cosine_similarities_alt.py
 src/hilfsfunktionen.egg-info/PKG-INFO
 src/hilfsfunktionen.egg-info/SOURCES.txt
 src/hilfsfunktionen.egg-info/dependency_links.txt
