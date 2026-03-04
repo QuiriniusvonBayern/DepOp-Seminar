@@ -1,128 +1,174 @@
+```python
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Set
 
-# ------- Deinition of Tests to compare Key-Vectors -----------
-def get_key_values(key, filter, prefix="key", df_with_keys=None):
-    values_with_keys = df_with_keys.iloc[key] #mit Keys
-    if filter:
-        return [w for w in values_with_keys if not w.startswith(prefix)]
+
+def get_key_values(key_index: int, filter_strings: bool, exclude_prefix: str, df_with_keys: pd.DataFrame, include_churn: bool = False) -> List[str]:
+    """Extract values from a specific row based on the given key index."""
+    row_values = df_with_keys.iloc[key_index]
+    
+    if not include_churn:
+        row_values = [str(val) for val in row_values if isinstance(val, str) and not str(val).startswith("Churn_")]
+    
+    if filter_strings:
+        return [str(val) for val in row_values if isinstance(val, str) and not str(val).startswith(exclude_prefix)]
     else:
-        return [w for w in values_with_keys]
+        return [str(val) for val in row_values]
 
-def compare_lists(list1, list2):
-    output:str = ""
-    anzahl_paare:int = 0
-    gleiche_paare = [(i, a, b) for i, (a, b) in enumerate(zip(list1, list2)) if a == b]
-    anzahl_paare = len(gleiche_paare)
-    output += f"{anzahl_paare} von {len(list1)} Gleiche Werte: "
-    for pos, a, b in gleiche_paare:
-        output += f"(Position {pos} : '{a}' )"
-    return output, anzahl_paare
 
-def has_churned(customer_index: int, df: pd.DataFrame):
+def compare_lists(list_a: List, list_b: List) -> Tuple[str, int]:
+    """Compare two lists element-wise and return matching elements with positions."""
+    output_message = ""
+    matching_pairs = [(idx, val_a, val_b) for idx, (val_a, val_b) in enumerate(zip(list_a, list_b)) if val_a == val_b]
+    match_count = len(matching_pairs)
+    
+    output_message += f"{match_count} of {len(list_a)} matching values: "
+    for position, val_a, val_b in matching_pairs:
+        output_message += f"(Position {position} : '{val_a}')"
+    
+    return output_message, match_count
+
+
+def has_churned(customer_index: int, dataframe: pd.DataFrame) -> bool:
     """
-    Check if a customer has turned based on their row index.
+    Determine whether a customer has churned based on their row index.
 
-    Prameters:
-    ----------
-    customer_index : int
-        Zero_based index of constomer row in the dataframe.
-    df : pd.DataFrame
-        DataFrame containing cusomer data with 'churn'-column
-        
+    Args:
+        customer_index: Zero-based index of the customer row.
+        dataframe: DataFrame containing customer data with a 'churn' column.
+
     Returns:
-    --------
-    bool
-        True if customer has churned (churn == 'Churn_Yes'), False otherwise
+        True if the customer has churned (churn == 'Churn_Yes'), False otherwise.
 
     Raises:
-    -------
-    IndexError
-        if customer_index out of bounds
-    ColumnError
-        If 'churn' column does not exist
+        IndexError: If the customer index is out of bounds or the 'churn' column is missing.
     """
-    if customer_index < 0 or customer_index >= len(df):
-        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df-1)}]")
-    if 'churn' not in df.columns:
-        raise IndexError(f"Column 'churn' not in the DataFrame.")
+    if customer_index < 0 or customer_index >= len(dataframe):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
+    if 'churn' not in dataframe.columns:
+        raise IndexError("Column 'churn' not in the DataFrame.")
 
-    churned_value = df.iloc[customer_index]['churn']
+    churn_value = dataframe.iloc[customer_index]['churn']
 
-    if pd.isna(churned_value):
+    if pd.isna(churn_value):
         return False
     
-    return "Churn_Yes" == churned_value
+    return "Churn_Yes" == churn_value
 
 
-# ------- Hilfsfunktionen -----------
+def is_female(customer_index: int, dataframe: pd.DataFrame) -> bool:
+    """
+    Determine whether a customer is female based on their row index.
 
-def get_key_values_new(key: int, filter_keys: bool = True, prefix: str = "key", df_with_keys=None) -> List[str]:
-    """Extrahiert Werte aus einer Zeile basierend auf dem Key-Index."""
-    values_with_keys = df_with_keys.iloc[key]
+    Args:
+        customer_index: Zero-based index of the customer row.
+        dataframe: DataFrame containing customer data with a 'gender' column.
+
+    Returns:
+        True if the customer is female ('Gender_Female'), False otherwise.
+
+    Raises:
+        IndexError: If the customer index is out of bounds or the 'gender' column is missing.
+    """
+    if customer_index < 0 or customer_index >= len(dataframe):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
+    if 'gender' not in dataframe.columns:
+        raise IndexError("Column 'gender' not in the DataFrame.")
+
+    gender_value = dataframe.iloc[customer_index]['gender']
+
+    if pd.isna(gender_value):
+        return False
+    
+    return "Gender_Female" == gender_value
+
+
+def get_country_code(customer_index: int, dataframe: pd.DataFrame) -> int:
+    """
+    Get the country code for a customer based on their row index.
+
+    Args:
+        customer_index: Zero-based index of the customer row.
+        dataframe: DataFrame containing customer data with a 'country' column.
+
+    Returns:
+        0 for France, 1 for Germany, 2 for Spain, 5 for unknown or missing.
+
+    Raises:
+        IndexError: If the customer index is out of bounds or the 'country' column is missing.
+    """
+    if customer_index < 0 or customer_index >= len(dataframe):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
+    if 'country' not in dataframe.columns:
+        raise IndexError("Column 'country' not in the DataFrame.")
+
+    country_value = dataframe.iloc[customer_index]['country']
+
+    if pd.isna(country_value):
+        return 5
+    
+    match country_value:
+        case "Country_France":
+            return 0
+        case "Country_Germany":
+            return 1
+        case "Country_Spain":
+            return 2
+
+    return 5
+
+
+def get_row_values(key_index: int, filter_keys: bool = True, exclude_prefix: str = "key", df_with_keys: pd.DataFrame = None) -> List[str]:
+    """Extract values from a specific row based on the key index, optionally filtering out keys."""
+    row_values = df_with_keys.iloc[key_index]
+    
     if filter_keys:
-        return [w for w in values_with_keys if not w.startswith(prefix)]
+        return [val for val in row_values if not val.startswith(exclude_prefix)]
     else:
-        return [w for w in values_with_keys]
+        return [val for val in row_values]
 
-# ---------------------------------------------------
-# Hauptmetrik: Key-zu-Zeilenwerte Proximity Score
-# ---------------------------------------------------
 
-def calculate_key_to_values_score(model, key: str, df_with_keys, topn: int = 20, 
-                                   filter_keys: bool = True, max_fetch: int = 1000, 
+def calculate_key_to_values_score(model, key: str, df_with_keys: pd.DataFrame, topn: int = 20,
+                                   filter_keys: bool = True, max_fetch: int = 1000,
                                    verbose: bool = False) -> Dict:
     """
-    Misst, wie gut ein Key die semantische Information seiner Zeile kodiert.
-    
-    Die Hypothese: Ein guter Key sollte im Vektorraum nahe bei seinen eigenen
-    Zeilenwerten liegen (z.B. key_1 nahe bei Age_Young_Seniors, Gender_Male, etc.)
-    
-    Parameters:
-    -----------
-    model : Word2Vec model
-    key : str (z.B. "key_1")
-    df_with_keys : pd.DataFrame
-    topn : int - Anzahl der gewünschten Nicht-Key Nachbarn
-    filter_keys : bool - Wenn True, werden andere Keys aus den Nachbarn gefiltert
-    max_fetch : int - Maximale Anzahl initialer Nachbarn (Standard: 1000)
-                      Wird nur verwendet wenn filter_keys=True
-    verbose : bool - Detaillierte Ausgabe
-    
+    Measure how well a key encodes the semantic information of its corresponding row.
+
+    A good key should be close in the vector space to its own row values
+    (e.g., key_1 close to Age_Young_Seniors, Gender_Male, etc.).
+
+    Args:
+        model: Word2Vec model.
+        key: Key string (e.g., "key_1").
+        df_with_keys: DataFrame containing keys and values.
+        topn: Number of desired non-key neighbors.
+        filter_keys: If True, filter other keys from neighbors.
+        max_fetch: Maximum initial neighbors to fetch when filtering.
+        verbose: If True, print detailed analysis.
+
     Returns:
-    --------
-    Dict mit:
-        - 'proximity_score': Anteil der eigenen Zeilenwerte in Top-N Nachbarn (0.0-1.0)
-        - 'weighted_proximity_score': Gewichteter Score (nähere Nachbarn zählen mehr)
-        - 'found_values': Anzahl gefundener eigener Zeilenwerte
-        - 'total_values': Gesamtzahl der Zeilenwerte
-        - 'missing_values': Zeilenwerte die nicht in Top-N sind
-        - 'details': Detaillierte Informationen
+        Dictionary containing proximity scores and detailed information.
     """
     key_index = int(key.replace("key_", ""))
-    key_values = get_key_values_new(key_index, filter_keys=True, df_with_keys=df_with_keys)
+    row_values = get_row_values(key_index, filter_keys=True, df_with_keys=df_with_keys)
     
-    # Filtere Zeilenwerte die im Modell-Vokabular sind
-    key_values_in_vocab = [v for v in key_values if v in model.wv]
+    row_values_in_vocab = [val for val in row_values if val in model.wv]
     
-    if len(key_values_in_vocab) == 0:
+    if len(row_values_in_vocab) == 0:
         return {
-            'error': f'Keine Zeilenwerte von {key} im Modell-Vokabular',
+            'error': f'No row values from {key} found in model vocabulary',
             'key': key,
-            'total_values': len(key_values)
+            'total_values': len(row_values)
         }
     
     try:
         if filter_keys:
-            # Hole deutlich mehr Nachbarn als nötig, um nach Filterung genug zu haben
             all_neighbors = model.wv.most_similar(key, topn=max_fetch)
             
-            # Filtere alle Keys raus
             non_key_neighbors = [(word, sim) for word, sim in all_neighbors 
                                   if not word.startswith("key_")]
             
-            # Nimm die Top-N der gefilterten Nachbarn
             neighbors = non_key_neighbors[:topn]
             
             if verbose:
@@ -130,33 +176,29 @@ def calculate_key_to_values_score(model, key: str, df_with_keys, topn: int = 20,
                 keys_filtered = total_fetched - len(non_key_neighbors)
                 actual_retrieved = len(neighbors)
                 
-                print(f"ℹ️  Nachbar-Statistik:")
-                print(f"   Initial geholt:        {total_fetched}")
-                print(f"   Davon Keys gefiltert:  {keys_filtered} ({keys_filtered/total_fetched*100:.1f}%)")
-                print(f"   Verbleibende Nicht-Keys: {len(non_key_neighbors)}")
-                print(f"   Verwendete Top-N:      {actual_retrieved}")
+                print(f"ℹ️  Neighbor statistics:")
+                print(f"   Initially fetched:        {total_fetched}")
+                print(f"   Keys filtered out:        {keys_filtered} ({keys_filtered/total_fetched*100:.1f}%)")
+                print(f"   Remaining non-keys:       {len(non_key_neighbors)}")
+                print(f"   Top-N used:               {actual_retrieved}")
                 
                 if actual_retrieved < topn:
-                    print(f"   ⚠️  Warnung: Nur {actual_retrieved}/{topn} Nicht-Key-Nachbarn gefunden!")
-                    print(f"      Erhöhe max_fetch (aktuell {max_fetch}) für bessere Ergebnisse.")
+                    print(f"   ⚠️  Warning: Only {actual_retrieved}/{topn} non-key neighbors found!")
+                    print(f"      Increase max_fetch (currently {max_fetch}) for better results.")
         else:
-            # Ohne Filter: Hole direkt die gewünschte Anzahl
             neighbors = model.wv.most_similar(key, topn=topn)
             
     except KeyError:
-        return {'error': f'{key} nicht im Vokabular'}
+        return {'error': f'{key} not in vocabulary'}
     
-    # Erstelle Set der Nachbar-Wörter für schnelle Suche
     neighbor_words = {word for word, _ in neighbors}
     
-    # Finde welche eigenen Zeilenwerte in den Nachbarn sind
     found_values = []
     missing_values = []
     
-    for value in key_values_in_vocab:
+    for value in row_values_in_vocab:
         if value in neighbor_words:
-            # Finde Rang und Similarity
-            rank = next(i for i, (w, _) in enumerate(neighbors) if w == value)
+            rank = next(i for i, (word, _) in enumerate(neighbors) if word == value)
             similarity = neighbors[rank][1]
             found_values.append({
                 'value': value,
@@ -165,7 +207,6 @@ def calculate_key_to_values_score(model, key: str, df_with_keys, topn: int = 20,
                 'weight': 1.0 / (rank + 1)
             })
         else:
-            # Prüfe wie weit entfernt der Wert tatsächlich ist
             try:
                 actual_similarity = model.wv.similarity(key, value)
                 missing_values.append({
@@ -178,49 +219,46 @@ def calculate_key_to_values_score(model, key: str, df_with_keys, topn: int = 20,
                     'similarity': None
                 })
     
-    # Berechne Scores
-    proximity_score = len(found_values) / len(key_values_in_vocab)
+    proximity_score = len(found_values) / len(row_values_in_vocab)
     
-    # Gewichteter Score: Werte die näher am Key sind, zählen mehr
     if len(found_values) > 0:
         weights = [item['weight'] for item in found_values]
-        # Normalisiere Gewichte
         weight_sum = sum(weights)
-        weighted_proximity_score = weight_sum / len(key_values_in_vocab)
+        weighted_proximity_score = weight_sum / len(row_values_in_vocab)
     else:
         weighted_proximity_score = 0.0
     
     if verbose:
         print(f"\n{'='*60}")
-        print(f"Analyse für {key} (Zeile {key_index})")
+        print(f"Analysis for {key} (row {key_index})")
         print(f"{'='*60}")
-        print(f"Filter Keys: {'Ja' if filter_keys else 'Nein'}")
+        print(f"Filter keys: {'Yes' if filter_keys else 'No'}")
         if filter_keys:
-            print(f"Max Fetch: {max_fetch}")
-        print(f"Zeilenwerte im Vokabular: {len(key_values_in_vocab)}/{len(key_values)}")
-        print(f"\nGefundene Werte in Top-{len(neighbors)} Nachbarn: {len(found_values)}/{len(key_values_in_vocab)}")
+            print(f"Max fetch: {max_fetch}")
+        print(f"Row values in vocabulary: {len(row_values_in_vocab)}/{len(row_values)}")
+        print(f"\nValues found in top-{len(neighbors)} neighbors: {len(found_values)}/{len(row_values_in_vocab)}")
         
         if found_values:
-            print("\n✓ Gefundene Zeilenwerte:")
+            print("\n✓ Found row values:")
             for item in sorted(found_values, key=lambda x: x['rank']):
-                print(f"  Rang {item['rank']:2d}: {item['value']:30s} (Sim: {item['similarity']:.4f})")
+                print(f"  Rank {item['rank']:2d}: {item['value']:30s} (Sim: {item['similarity']:.4f})")
         
         if missing_values and verbose:
-            print(f"\n✗ Fehlende Zeilenwerte (nicht in Top-{topn}):")
+            print(f"\n✗ Missing row values (not in top-{topn}):")
             for item in sorted(missing_values, key=lambda x: x['similarity'] if x['similarity'] else -1, reverse=True)[:5]:
                 sim_str = f"{item['similarity']:.4f}" if item['similarity'] else "N/A"
                 print(f"  {item['value']:30s} (Sim: {sim_str})")
         
-        print(f"\nProximity Score:          {proximity_score:.3f}")
-        print(f"Weighted Proximity Score: {weighted_proximity_score:.3f}")
+        print(f"\nProximity score:          {proximity_score:.3f}")
+        print(f"Weighted proximity score: {weighted_proximity_score:.3f}")
     
     return {
         'key': key,
         'proximity_score': proximity_score,
         'weighted_proximity_score': weighted_proximity_score,
         'found_values': len(found_values),
-        'total_values_in_vocab': len(key_values_in_vocab),
-        'total_values': len(key_values),
+        'total_values_in_vocab': len(row_values_in_vocab),
+        'total_values': len(row_values),
         'missing_values': len(missing_values),
         'found_details': found_values,
         'missing_details': missing_values,
@@ -230,40 +268,35 @@ def calculate_key_to_values_score(model, key: str, df_with_keys, topn: int = 20,
         'actual_neighbors_count': len(neighbors)
     }
 
-# ---------------------------------------------------
-# Gesamtbewertung über mehrere Keys
-# ---------------------------------------------------
 
-def evaluate_model_key_quality(model, df_with_keys, num_keys: int = 10, topn: int = 20, 
-                                filter_keys: bool = True, max_fetch: int = 1000, 
+def evaluate_model_key_quality(model, df_with_keys: pd.DataFrame, num_keys: int = 10, topn: int = 20,
+                                filter_keys: bool = True, max_fetch: int = 1000,
                                 verbose: bool = False) -> Dict:
     """
-    Evaluiert die Key-Quality über mehrere Keys.
-    
-    Misst wie gut Keys die semantische Information ihrer Zeilen kodieren,
-    indem geprüft wird, ob die Zeilenwerte im Vektorraum nahe beim Key liegen.
-    
-    Parameters:
-    -----------
-    filter_keys : bool - Wenn True, werden andere Keys aus Nachbarn gefiltert.
-                         Dies zeigt die echte Key→Werte Beziehung ohne Key-Clustering-Effekt.
-    max_fetch : int - Maximale Anzahl initialer Nachbarn beim Filtern (Standard: 1000).
-                      Höhere Werte = mehr Nicht-Key-Nachbarn, aber langsamer.
-    
+    Evaluate key quality across multiple keys.
+
+    Measures how well keys encode the semantic information of their rows by checking
+    if row values are close to the key in the vector space.
+
+    Args:
+        model: Word2Vec model.
+        df_with_keys: DataFrame containing keys and values.
+        num_keys: Number of keys to sample for evaluation.
+        topn: Number of neighbors to consider.
+        filter_keys: If True, filter other keys from neighbors.
+        max_fetch: Maximum initial neighbors to fetch when filtering.
+        verbose: If True, print detailed evaluation.
+
     Returns:
-    --------
-    Dict mit aggregierten Metriken und Einzelergebnissen
+        Dictionary with aggregated metrics and interpretations.
     """
-    # Wähle zufällige Keys aus
     available_keys = [f"key_{i}" for i in range(len(df_with_keys))]
     
-    # Filtere Keys die im Modell vorhanden sind
-    valid_keys = [k for k in available_keys if k in model.wv]
+    valid_keys = [key for key in available_keys if key in model.wv]
     
     if len(valid_keys) == 0:
-        return {'error': 'Keine gültigen Keys im Modell gefunden'}
+        return {'error': 'No valid keys found in model'}
     
-    # Wähle Stichprobe
     sample_size = min(num_keys, len(valid_keys))
     sampled_keys = np.random.choice(valid_keys, size=sample_size, replace=False)
     
@@ -271,11 +304,11 @@ def evaluate_model_key_quality(model, df_with_keys, num_keys: int = 10, topn: in
         print(f"\n{'='*70}")
         print(f"  WORD2VEC KEY-TO-VALUES PROXIMITY EVALUATION")
         print(f"{'='*70}")
-        print(f"Evaluiere {sample_size} Keys mit Top-{topn} Nicht-Key-Nachbarn")
-        print(f"Filter Keys aus Nachbarn: {'Ja ✓' if filter_keys else 'Nein ✗'}")
+        print(f"Evaluating {sample_size} keys with top-{topn} non-key neighbors")
+        print(f"Filter keys from neighbors: {'Yes ✓' if filter_keys else 'No ✗'}")
         if filter_keys:
-            print(f"Max Fetch pro Key: {max_fetch}")
-        print(f"Hypothese: Keys sollten nahe bei ihren eigenen Zeilenwerten liegen")
+            print(f"Max fetch per key: {max_fetch}")
+        print(f"Hypothesis: Keys should be close to their own row values")
         print(f"{'='*70}")
     
     results = []
@@ -286,16 +319,15 @@ def evaluate_model_key_quality(model, df_with_keys, num_keys: int = 10, topn: in
             results.append(result)
     
     if len(results) == 0:
-        return {'error': 'Keine auswertbaren Keys gefunden'}
+        return {'error': 'No evaluable keys found'}
     
-    # Aggregiere Ergebnisse
-    avg_proximity = np.mean([r['proximity_score'] for r in results])
-    avg_weighted_proximity = np.mean([r['weighted_proximity_score'] for r in results])
-    total_found = sum([r['found_values'] for r in results])
-    total_possible = sum([r['total_values_in_vocab'] for r in results])
+    avg_proximity = np.mean([res['proximity_score'] for res in results])
+    avg_weighted_proximity = np.mean([res['weighted_proximity_score'] for res in results])
+    total_found = sum([res['found_values'] for res in results])
+    total_possible = sum([res['total_values_in_vocab'] for res in results])
     
     summary = {
-        'model_score': avg_weighted_proximity,  # Hauptmetrik für Vergleiche
+        'model_score': avg_weighted_proximity,
         'avg_proximity_score': avg_proximity,
         'avg_weighted_proximity_score': avg_weighted_proximity,
         'total_found_values': total_found,
@@ -305,59 +337,55 @@ def evaluate_model_key_quality(model, df_with_keys, num_keys: int = 10, topn: in
         'topn': topn,
         'filter_keys': filter_keys,
         'max_fetch': max_fetch if filter_keys else None,
-        'interpretation': interpret_proximity_score(avg_weighted_proximity),
-        #'individual_results': results
+        'interpretation': _interpret_proximity_score(avg_weighted_proximity),
     }
     
     if verbose:
         print(f"\n{'='*70}")
-        print(f"  ZUSAMMENFASSUNG")
+        print(f"  SUMMARY")
         print(f"{'='*70}")
-        print(f"Filter Keys aktiviert:       {'Ja ✓' if filter_keys else 'Nein ✗'}")
+        print(f"Filter keys enabled:       {'Yes ✓' if filter_keys else 'No ✗'}")
         if filter_keys:
-            print(f"Max Fetch verwendet:         {max_fetch}")
-        print(f"Model Score (gewichtet):     {avg_weighted_proximity:.3f}")
-        print(f"Ø Proximity Score:           {avg_proximity:.3f}")
-        print(f"Gesamt Recall:               {summary['overall_recall']:.3f} ({total_found}/{total_possible})")
-        print(f"Keys evaluiert:              {len(results)}")
-        print(f"Interpretation:              {summary['interpretation']}")
+            print(f"Max fetch used:            {max_fetch}")
+        print(f"Model score (weighted):     {avg_weighted_proximity:.3f}")
+        print(f"Average proximity score:    {avg_proximity:.3f}")
+        print(f"Overall recall:             {summary['overall_recall']:.3f} ({total_found}/{total_possible})")
+        print(f"Keys evaluated:             {len(results)}")
+        print(f"Interpretation:             {summary['interpretation']}")
         print(f"{'='*70}\n")
     
     return summary
 
-def interpret_proximity_score(score: float) -> str:
-    """Interpretiert den Proximity Score."""
+
+def _interpret_proximity_score(score: float) -> str:
+    """Provide a textual interpretation of a proximity score."""
     if score >= 0.7:
-        return "Exzellent - Keys kodieren ihre Zeilenwerte sehr gut"
+        return "Excellent - Keys encode their row values very well"
     elif score >= 0.5:
-        return "Gut - Keys haben starke Nähe zu ihren Zeilenwerten"
+        return "Good - Keys show strong proximity to their row values"
     elif score >= 0.3:
-        return "Akzeptabel - Moderate Proximity zu Zeilenwerten"
+        return "Acceptable - Moderate proximity to row values"
     elif score >= 0.15:
-        return "Schwach - Geringe Nähe zu eigenen Zeilenwerten"
+        return "Weak - Low proximity to own row values"
     else:
-        return "Ungenügend - Keys kodieren ihre Zeilenwerte kaum"
+        return "Insufficient - Keys barely encode their row values"
 
-# ---------------------------------------------------
-# Zusätzliche Analyse: Key-Spezifität
-# ---------------------------------------------------
 
-def analyze_key_specificity(model, key: str, df_with_keys, topn: int = 50) -> Dict:
+def analyze_key_specificity(model, key: str, df_with_keys: pd.DataFrame, topn: int = 50) -> Dict:
     """
-    Analysiert wie spezifisch ein Key seine Zeile repräsentiert.
-    
-    Misst das Verhältnis von:
-    - Eigenen Zeilenwerten in Nachbarn (gut)
-    - Fremden Zeilenwerten in Nachbarn (schlecht - zu generisch)
-    - Sonstigen Wörtern in Nachbarn (neutral)
+    Analyze how specifically a key represents its row.
+
+    Measures the ratio of:
+    - Own row values among neighbors (good)
+    - Foreign row values among neighbors (bad - too generic)
+    - Other tokens among neighbors (neutral)
     """
     key_index = int(key.replace("key_", ""))
-    own_values = set(get_key_values_new(key_index, filter_keys=True, df_with_keys=df_with_keys))
+    own_values = set(get_row_values(key_index, filter_keys=True, df_with_keys=df_with_keys))
     
-    # Sammle alle Zeilenwerte aus dem gesamten DataFrame
     all_row_values = set()
     for idx in range(len(df_with_keys)):
-        row_values = get_key_values_new(idx, filter_keys=True, df_with_keys=df_with_keys)
+        row_values = get_row_values(idx, filter_keys=True, df_with_keys=df_with_keys)
         all_row_values.update(row_values)
     
     foreign_values = all_row_values - own_values
@@ -365,13 +393,13 @@ def analyze_key_specificity(model, key: str, df_with_keys, topn: int = 50) -> Di
     try:
         neighbors = model.wv.most_similar(key, topn=topn)
     except KeyError:
-        return {'error': f'{key} nicht im Vokabular'}
+        return {'error': f'{key} not in vocabulary'}
     
     own_count = 0
     foreign_count = 0
     other_count = 0
     
-    for word, sim in neighbors:
+    for word, _ in neighbors:
         if word in own_values:
             own_count += 1
         elif word in foreign_values:
@@ -387,31 +415,30 @@ def analyze_key_specificity(model, key: str, df_with_keys, topn: int = 50) -> Di
         'foreign_values': foreign_count,
         'other_tokens': other_count,
         'specificity_score': specificity_score,
-        'interpretation': 'Spezifisch' if specificity_score > 0.2 else 'Generisch' if specificity_score < -0.2 else 'Neutral'
+        'interpretation': 'Specific' if specificity_score > 0.2 else 'Generic' if specificity_score < -0.2 else 'Neutral'
     }
 
-# ---------------------------------------------------
-# Modellvergleich
-# ---------------------------------------------------
 
-def compare_models(models_dict: Dict, df_with_keys, num_keys: int = 10, topn: int = 20, 
+def compare_models(models_dict: Dict, df_with_keys: pd.DataFrame, num_keys: int = 10, topn: int = 20,
                    filter_keys: bool = True, max_fetch: int = 1000) -> pd.DataFrame:
     """
-    Vergleicht mehrere Word2Vec-Modelle anhand ihrer Key-Quality.
-    
-    Parameters:
-    -----------
-    models_dict : Dict[str, Word2Vec]
-        Dictionary mit Modellnamen als Keys und Modellen als Values
-    
+    Compare multiple Word2Vec models based on their key quality.
+
+    Args:
+        models_dict: Dictionary with model names as keys and Word2Vec models as values.
+        df_with_keys: DataFrame containing keys and values.
+        num_keys: Number of keys to sample for evaluation.
+        topn: Number of neighbors to consider.
+        filter_keys: If True, filter other keys from neighbors.
+        max_fetch: Maximum initial neighbors to fetch when filtering.
+
     Returns:
-    --------
-    pd.DataFrame mit Vergleichsergebnissen, sortiert nach Score
+        DataFrame with comparison results, sorted by quality score.
     """
     comparison_results = []
     
     for model_name, model in models_dict.items():
-        print(f"\nEvaluiere Modell: {model_name}")
+        print(f"\nEvaluating model: {model_name}")
         result = evaluate_model_key_quality(model, df_with_keys, num_keys, topn, filter_keys, max_fetch, verbose=False)
         
         if 'error' not in result:
@@ -431,4 +458,4 @@ def compare_models(models_dict: Dict, df_with_keys, num_keys: int = 10, topn: in
     df_comparison = df_comparison.sort_values('Quality Score', ascending=False)
     
     return df_comparison
-
+```
