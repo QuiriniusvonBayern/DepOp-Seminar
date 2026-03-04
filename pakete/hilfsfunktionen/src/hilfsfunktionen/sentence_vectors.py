@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 from .benchmark_of_semantic_operatiors import get_vector_list
-from .key_vector_tests import get_key_values, has_churned, is_female, in_country
+from .key_vector_tests import get_key_values, has_churned, is_female, get_country_code
 from gensim.models import Word2Vec
 
 
@@ -51,7 +51,7 @@ def calculate_average_sentence_vectors(
             vectors.append(np.mean(sentence_vectors, axis=0))
             churned_status.append(has_churned(customer_index=i, df=df_with_keys))
             female_status.append(is_female(customer_index=i, df=df_with_keys))
-            country_status.append(in_country(customer_index=i, df=df_with_keys))
+            country_status.append(get_country_code(customer_index=i, df=df_with_keys))
 
     return pd.DataFrame(
         {

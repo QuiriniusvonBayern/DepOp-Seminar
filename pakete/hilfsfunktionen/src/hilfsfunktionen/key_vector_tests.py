@@ -1,4 +1,3 @@
-```python
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Set
@@ -30,13 +29,13 @@ def compare_lists(list_a: List, list_b: List) -> Tuple[str, int]:
     return output_message, match_count
 
 
-def has_churned(customer_index: int, dataframe: pd.DataFrame) -> bool:
+def has_churned(customer_index: int, df: pd.DataFrame) -> bool:
     """
     Determine whether a customer has churned based on their row index.
 
     Args:
         customer_index: Zero-based index of the customer row.
-        dataframe: DataFrame containing customer data with a 'churn' column.
+        df: DataFrame containing customer data with a 'churn' column.
 
     Returns:
         True if the customer has churned (churn == 'Churn_Yes'), False otherwise.
@@ -44,12 +43,12 @@ def has_churned(customer_index: int, dataframe: pd.DataFrame) -> bool:
     Raises:
         IndexError: If the customer index is out of bounds or the 'churn' column is missing.
     """
-    if customer_index < 0 or customer_index >= len(dataframe):
-        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
-    if 'churn' not in dataframe.columns:
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df)-1}]")
+    if 'churn' not in df.columns:
         raise IndexError("Column 'churn' not in the DataFrame.")
 
-    churn_value = dataframe.iloc[customer_index]['churn']
+    churn_value = df.iloc[customer_index]['churn']
 
     if pd.isna(churn_value):
         return False
@@ -57,13 +56,13 @@ def has_churned(customer_index: int, dataframe: pd.DataFrame) -> bool:
     return "Churn_Yes" == churn_value
 
 
-def is_female(customer_index: int, dataframe: pd.DataFrame) -> bool:
+def is_female(customer_index: int, df: pd.DataFrame) -> bool:
     """
     Determine whether a customer is female based on their row index.
 
     Args:
         customer_index: Zero-based index of the customer row.
-        dataframe: DataFrame containing customer data with a 'gender' column.
+        df: DataFrame containing customer data with a 'gender' column.
 
     Returns:
         True if the customer is female ('Gender_Female'), False otherwise.
@@ -71,12 +70,12 @@ def is_female(customer_index: int, dataframe: pd.DataFrame) -> bool:
     Raises:
         IndexError: If the customer index is out of bounds or the 'gender' column is missing.
     """
-    if customer_index < 0 or customer_index >= len(dataframe):
-        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
-    if 'gender' not in dataframe.columns:
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df)-1}]")
+    if 'gender' not in df.columns:
         raise IndexError("Column 'gender' not in the DataFrame.")
 
-    gender_value = dataframe.iloc[customer_index]['gender']
+    gender_value = df.iloc[customer_index]['gender']
 
     if pd.isna(gender_value):
         return False
@@ -84,13 +83,13 @@ def is_female(customer_index: int, dataframe: pd.DataFrame) -> bool:
     return "Gender_Female" == gender_value
 
 
-def get_country_code(customer_index: int, dataframe: pd.DataFrame) -> int:
+def get_country_code(customer_index: int, df: pd.DataFrame) -> int:
     """
     Get the country code for a customer based on their row index.
 
     Args:
         customer_index: Zero-based index of the customer row.
-        dataframe: DataFrame containing customer data with a 'country' column.
+        df: DataFrame containing customer data with a 'country' column.
 
     Returns:
         0 for France, 1 for Germany, 2 for Spain, 5 for unknown or missing.
@@ -98,12 +97,12 @@ def get_country_code(customer_index: int, dataframe: pd.DataFrame) -> int:
     Raises:
         IndexError: If the customer index is out of bounds or the 'country' column is missing.
     """
-    if customer_index < 0 or customer_index >= len(dataframe):
-        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(dataframe)-1}]")
-    if 'country' not in dataframe.columns:
+    if customer_index < 0 or customer_index >= len(df):
+        raise IndexError(f"Customer index {customer_index} out of bounds for [0, {len(df)-1}]")
+    if 'country' not in df.columns:
         raise IndexError("Column 'country' not in the DataFrame.")
 
-    country_value = dataframe.iloc[customer_index]['country']
+    country_value = df.iloc[customer_index]['country']
 
     if pd.isna(country_value):
         return 5
@@ -458,4 +457,3 @@ def compare_models(models_dict: Dict, df_with_keys: pd.DataFrame, num_keys: int 
     df_comparison = df_comparison.sort_values('Quality Score', ascending=False)
     
     return df_comparison
-```

@@ -9,8 +9,8 @@ import pandas as pd
 import numpy as np
 
 from .Semantic_SQL_Model_Quality_Score_tests import (
-    neighborhood_discriminability_test_silhouette,
-    rank_stability_test_average,
+    neighborhood_discriminability_silhouette,
+    rank_stability_average,
     feature_coherence_test,
 )
 from .key_vector_tests import evaluate_model_key_quality
@@ -215,16 +215,16 @@ def _run_all_tests(
     full_result = {"params": model_info}
 
     # Raw metrics
-    full_result["nd"] = neighborhood_discriminability_test_silhouette(model, verbose=verbose)
+    full_result["nd"] = neighborhood_discriminability_silhouette(model, verbose=verbose)
 
     full_result["rs_mean"], full_result["rs_5"], full_result["rs_10"], full_result["rs_20"] = (
-        rank_stability_test_average(sentence_vectors_list, verbose)
+        rank_stability_average(sentence_vectors_list, verbose)
     )
 
     full_result["fc"] = feature_coherence_test(
         model_list=sentence_vectors_list,
         verbose=verbose,
-        df_with_fc_labels=fc_label_dataframe,
+        dataframe_with_labels=fc_label_dataframe,
     )
 
     full_result["kvc"] = evaluate_model_key_quality(
@@ -332,7 +332,7 @@ def get_all_grid_results(
             )
 
         result_data = _run_all_tests(
-            info=vectors_entry["model_info"],
+            model_info=vectors_entry["model_info"],
             sentence_vectors_list=vectors_entry,
             model=model,
             verbose=verbose,
@@ -442,7 +442,7 @@ def get_all_sweep_results(
                 )
 
             result_data = _run_all_tests(
-                info=vectors_entry["model_info"],
+                model_info=vectors_entry["model_info"],
                 sentence_vectors_list=vectors_entry,
                 model=model,
                 verbose=verbose,

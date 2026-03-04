@@ -4,10 +4,10 @@ processing, including text tokenization and data transformation utilities.
 """
 
 import pandas as pd
-from .db import read_table_to_df, get_engine
+from .db import read_table_to_dataframe, get_engine
 
 engine = get_engine()
-df_customers = read_table_to_df("SELECT * FROM bank_customers;", engine=engine)
+df_customers = read_table_to_dataframe("SELECT * FROM bank_customers;", engine=engine)
 
 
 def text_to_tokens(text):

@@ -78,7 +78,7 @@ def get_vector_list(model, key, df_with_keys=None):
     vector_list = []
     feature_names = []
     
-    key_values = get_key_values(key, False, prefix="key", df_with_keys=df_with_keys)
+    key_values = get_key_values(key, False, exclude_prefix="key", df_with_keys=df_with_keys)
     key_values_filtered = filter_keys(key_values)
     
     for value in key_values_filtered:
@@ -205,10 +205,10 @@ def evaluate_most_similar_proximity_avg(model, test_cases, verbose, df_with_keys
         if verbose:
             print(result_text)
         most_similar_sentences = find_n_most_similar_to_key(model, test_case, "proximity_avg", df_with_keys=df_with_keys)
-        sentence_of_testcase = get_key_values(test_case, True, prefix="key", df_with_keys=df_with_keys)
+        sentence_of_testcase = get_key_values(test_case, True, exclude_prefix="key", df_with_keys=df_with_keys)
         temp = 0
         for sentence in most_similar_sentences:
-            output, anzahl_paare = compare_lists(get_key_values(sentence[0], True, prefix="key", df_with_keys=df_with_keys), sentence_of_testcase)
+            output, anzahl_paare = compare_lists(get_key_values(sentence[0], True, exclude_prefix="key", df_with_keys=df_with_keys), sentence_of_testcase)
             temp += anzahl_paare
             if verbose:
                 print(f"Key_{sentence[0]}: {output}")
@@ -237,10 +237,10 @@ def evaluate_most_similar_proximity_topn_avg(model, test_cases, verbose, df_with
         if verbose:
             print(result_text)
         most_similar_sentences = find_n_most_similar_to_key(model, test_case, method, df_with_keys=df_with_keys)
-        sentence_of_testcase = get_key_values(test_case, True, prefix="key", df_with_keys=df_with_keys)
+        sentence_of_testcase = get_key_values(test_case, True, exclude_prefix="key", df_with_keys=df_with_keys)
         temp = 0
         for sentence in most_similar_sentences:
-            output, anzahl_paare = compare_lists(get_key_values(sentence[0], True, prefix="key", df_with_keys=df_with_keys), sentence_of_testcase)
+            output, anzahl_paare = compare_lists(get_key_values(sentence[0], True, exclude_prefix="key", df_with_keys=df_with_keys), sentence_of_testcase)
             temp += anzahl_paare
             if verbose:
                 print(f"Key_{sentence[0]}: {output}")

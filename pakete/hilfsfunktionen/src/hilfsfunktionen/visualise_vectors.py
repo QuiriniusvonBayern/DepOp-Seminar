@@ -1,4 +1,3 @@
-```python
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -273,4 +272,3 @@ def print_model_metrics(models_list):
             f"{row[key]:<{col_widths[key]}}" for key in all_keys
         )
         print(line)
-```

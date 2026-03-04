@@ -1,7 +1,6 @@
 LICENSE
 README.md
 pyproject.toml
-src/hilfsfunktionen/Semantic_SQL_Model_Quality_Score_tests copy.py
 src/hilfsfunktionen/Semantic_SQL_Model_Quality_Score_tests.py
 src/hilfsfunktionen/__init__.py
 src/hilfsfunktionen/benchmark_of_semantic_operatiors.py
@@ -19,4 +18,17 @@ src/hilfsfunktionen.egg-info/PKG-INFO
 src/hilfsfunktionen.egg-info/SOURCES.txt
 src/hilfsfunktionen.egg-info/dependency_links.txt
 src/hilfsfunktionen.egg-info/top_level.txt
+src/hilfsfunktionen/temp/Semantic_SQL_Model_Quality_Score_tests copy_fertig.py
+src/hilfsfunktionen/temp/Semantic_SQL_Model_Quality_Score_tests.py
+src/hilfsfunktionen/temp/benchmark_of_semantic_operatiors_fertig.py
+src/hilfsfunktionen/temp/collect_test_data_fertig.py
+src/hilfsfunktionen/temp/config_fertig.py
+src/hilfsfunktionen/temp/cosine_funktions_fertig.py
+src/hilfsfunktionen/temp/db_fertig.py
+src/hilfsfunktionen/temp/formating_fertig.py
+src/hilfsfunktionen/temp/key_vector_tests_fertig.py
+src/hilfsfunktionen/temp/model_training_fertig.py
+src/hilfsfunktionen/temp/sentence_vectors_fertig.py
+src/hilfsfunktionen/temp/visualise_vectors_fertig.py
+src/hilfsfunktionen/temp/weighting_cosine_similarities.py
 tests/test_modul_1.py
