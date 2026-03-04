@@ -2,19 +2,29 @@ import os
 from dotenv import load_dotenv
 
 def load_postgres_config():
-    """Lädt die PostgreSQL-Konfiguration aus Umgebungsvariablen."""
+    """
+    Load PostgreSQL connection configuration from environment variables.
+
+    Returns:
+        dict: Dictionary containing database connection parameters with keys:
+            - host: Database server host
+            - port: Database server port
+            - dbname: Name of the database
+            - user: Username for authentication
+            - password: Password for authentication
+    """
     load_dotenv()
 
     host = os.environ["POSTGRES_HOST"]
     port = int(os.environ.get("POSTGRES_PORT", "5432"))
-    db   = os.environ["POSTGRES_DB"]
+    dbname = os.environ["POSTGRES_DB"]
     user = os.environ["POSTGRES_USER"]
-    pwd  = os.environ["POSTGRES_PASSWORD"]
+    password = os.environ["POSTGRES_PASSWORD"]
 
     return {
         "host": host,
         "port": port,
-        "dbname": db,
+        "dbname": dbname,
         "user": user,
-        "password": pwd
+        "password": password
     }
